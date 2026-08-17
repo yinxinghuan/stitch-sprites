@@ -1,6 +1,6 @@
 import { GameAudio } from './audio'
 import { createCells, createColumns, LEVELS } from './levels'
-import { chooseReachableCell, findReachable, reachableColors } from './reachability'
+import { chooseReachableCell, findReachable, findWalkPath, reachableColors } from './reachability'
 import type { ActiveSlot, GameSnapshot, LevelDefinition, SpoolState, StitchTask, ThreadColor } from './types'
 
 interface EngineHooks {
@@ -107,8 +107,7 @@ export class GameEngine {
     this.busy = true
     const runGeneration = this.generation
     const densityScale = this.level.density * this.level.density
-    const travelDelay = Math.max(14, Math.round(130 / densityScale))
-    const settleDelay = Math.max(9, Math.round(80 / densityScale))
+    const settleDelay = 110
 
     while (this.phase === 'playing' && runGeneration === this.generation) {
       const reachable = findReachable(this.cells)
@@ -117,13 +116,33 @@ export class GameEngine {
       let introducedWaiting = false
 
       this.slots.forEach((slot) => {
-        const target = chooseReachableCell(this.cells, reachable, slot.spool.color, reserved)
+        const workerCount = Math.min(
+          slot.spool.remaining,
+          Math.max(4, Math.min(12, Math.ceil(slot.spool.capacity / 9))),
+        )
+        let foundTarget = false
+        for (let workerIndex = 0; workerIndex < workerCount; workerIndex += 1) {
+          const target = chooseReachableCell(this.cells, reachable, slot.spool.color, reserved)
+          if (!target) break
+          const path = findWalkPath(this.cells, target)
+          if (!path.length) break
+          foundTarget = true
+          reserved.add(`${target.row}:${target.col}`)
+          const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18))
+          tasks.push({
+            slotId: slot.slotId,
+            color: slot.spool.color,
+            row: target.row,
+            col: target.col,
+            workerIndex,
+            path,
+            travelMs,
+          })
+        }
+        const target = foundTarget
         const nextState = target ? 'working' : 'waiting'
         if (slot.state !== 'waiting' && nextState === 'waiting') introducedWaiting = true
         slot.state = nextState
-        if (!target) return
-        reserved.add(`${target.row}:${target.col}`)
-        tasks.push({ slotId: slot.slotId, color: slot.spool.color, row: target.row, col: target.col })
       })
 
       if (!tasks.length) {
@@ -145,10 +164,9 @@ export class GameEngine {
       this.hooks.onTasks(tasks)
       this.audio.depart()
       this.emit()
-      await delay(travelDelay)
-      if (runGeneration !== this.generation) return
-
-      tasks.forEach((task) => {
+      await Promise.all(tasks.map(async (task) => {
+        await delay(task.travelMs)
+        if (runGeneration !== this.generation) return
         const cell = this.cells[task.row]?.[task.col]
         const slot = this.slots.find((candidate) => candidate.slotId === task.slotId)
         if (!cell || !slot || cell.cleared || slot.spool.remaining <= 0) return
@@ -156,8 +174,9 @@ export class GameEngine {
         slot.spool.remaining -= 1
         this.removed += 1
         if (this.removed % this.level.density === 0) this.audio.unstitch()
-      })
-      this.emit()
+        this.emit()
+      }))
+      if (runGeneration !== this.generation) return
       await delay(settleDelay)
       if (runGeneration !== this.generation) return
 

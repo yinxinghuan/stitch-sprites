@@ -52,7 +52,7 @@ async function selectPath(page, columns) {
     await spool.waitFor({ state: 'visible' })
     await spool.click()
     await page.waitForTimeout(120)
-    await page.waitForFunction(() => document.querySelectorAll('.ss-slot--working').length === 0, null, { timeout: 6000 })
+    await page.waitForFunction(() => document.querySelectorAll('.ss-slot--working').length === 0, null, { timeout: 20000 })
   }
 }
 

@@ -4,7 +4,7 @@ import type { GameSnapshot, StitchTask, ThreadColor } from './types'
 
 interface Mission extends StitchTask {
   startedAt: number
-  duration: number
+  returnMs: number
 }
 
 interface BoardGeometry {
@@ -42,12 +42,11 @@ export class BoardRenderer {
 
   launch(tasks: StitchTask[]): void {
     const startedAt = performance.now()
-    const density = this.snapshot?.level.density ?? 1
-    tasks.forEach((task, index) => {
+    tasks.forEach((task) => {
       this.missions.push({
         ...task,
-        startedAt: startedAt + index * 16,
-        duration: this.reducedMotion ? 30 : Math.max(42, 140 / density),
+        startedAt,
+        returnMs: Math.max(300, task.travelMs * 0.62),
       })
     })
   }
@@ -96,7 +95,7 @@ export class BoardRenderer {
       this.drawStitches(ctx, geometry, time)
       this.drawMissions(ctx, geometry, time)
     }
-    this.missions = this.missions.filter((mission) => time < mission.startedAt + mission.duration + 150)
+    this.missions = this.missions.filter((mission) => time < mission.startedAt + mission.travelMs + 100 + mission.returnMs + 100)
     this.frame = requestAnimationFrame((nextTime) => this.draw(nextTime))
   }
 
@@ -324,41 +323,77 @@ export class BoardRenderer {
 
   private drawMissions(ctx: CanvasRenderingContext2D, geo: BoardGeometry, time: number): void {
     this.missions.forEach((mission) => {
-      const raw = Math.max(0, Math.min(1, (time - mission.startedAt) / mission.duration))
-      const p = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2
-      const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
-      const targetY = geo.top + (mission.row + 0.5) * geo.cellSize
-      const startX = this.width / 2
-      const startY = geo.top + geo.height + 23
-      const controlX = startX + (targetX - startX) * 0.42
-      const controlY = Math.min(startY, targetY) - Math.max(22, geo.height * 0.13)
-      const inv = 1 - p
-      const x = inv * inv * startX + 2 * inv * p * controlX + p * p * targetX
-      const y = inv * inv * startY + 2 * inv * p * controlY + p * p * targetY
-      const thread = THREAD_COLORS[mission.color]
+      const elapsed = time - mission.startedAt
+      if (elapsed < 0) return
+      const contactMs = 100
+      const returning = elapsed > mission.travelMs + contactMs
+      const outboundProgress = Math.max(0, Math.min(1, elapsed / mission.travelMs))
+      const returnProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs - contactMs) / mission.returnMs))
+      const pathProgress = returning ? 1 - returnProgress : outboundProgress
+      const position = this.sampleWalkPath(mission.path, pathProgress, geo)
+      const ahead = this.sampleWalkPath(mission.path, Math.max(0, Math.min(1, pathProgress + (returning ? -0.02 : 0.02))), geo)
+      const direction = Math.atan2(ahead.y - position.y, ahead.x - position.x)
+      const spread = (mission.workerIndex - 3) * Math.min(0.7, geo.cellSize * 0.08)
+      const x = position.x + Math.cos(direction + Math.PI / 2) * spread
+      const y = position.y + Math.sin(direction + Math.PI / 2) * spread
+      const gait = elapsed / 115 + mission.workerIndex * 0.7
       ctx.save()
-      ctx.strokeStyle = thread.hex
-      ctx.globalAlpha = 0.45 * (1 - raw * 0.45)
-      ctx.lineWidth = 2.2
-      ctx.beginPath()
-      ctx.moveTo(startX, startY)
-      ctx.quadraticCurveTo(controlX, controlY, x, y)
-      ctx.stroke()
-      ctx.globalAlpha = 1
-      this.drawSprite(ctx, x, y, geo.cellSize * 0.36, mission.color, raw)
+      this.drawSprite(ctx, x, y, Math.max(4.8, geo.cellSize * 0.88), mission.color, gait, direction, returning)
       ctx.restore()
     })
   }
 
-  private drawSprite(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, color: ThreadColor, progress: number): void {
+  private sampleWalkPath(path: Array<{ row: number; col: number }>, progress: number, geo: BoardGeometry): { x: number; y: number } {
+    if (!path.length) return { x: this.width / 2, y: geo.top + geo.height + geo.cellSize }
+    if (path.length === 1) {
+      return {
+        x: geo.left + (path[0].col + 0.5) * geo.cellSize,
+        y: geo.top + (path[0].row + 0.5) * geo.cellSize,
+      }
+    }
+    const scaled = progress * (path.length - 1)
+    const index = Math.min(path.length - 2, Math.floor(scaled))
+    const local = scaled - index
+    const from = path[index]
+    const to = path[index + 1]
+    return {
+      x: geo.left + (from.col + 0.5 + (to.col - from.col) * local) * geo.cellSize,
+      y: geo.top + (from.row + 0.5 + (to.row - from.row) * local) * geo.cellSize,
+    }
+  }
+
+  private drawSprite(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    radius: number,
+    color: ThreadColor,
+    gait: number,
+    direction: number,
+    carrying: boolean,
+  ): void {
     const thread = THREAD_COLORS[color]
-    const bob = this.reducedMotion ? 0 : Math.sin(progress * Math.PI * 8) * radius * 0.12
-    y += bob
+    const step = this.reducedMotion ? 0 : Math.sin(gait * Math.PI * 2)
+    y += Math.abs(step) * -radius * 0.08
     ctx.save()
     ctx.translate(x, y)
+    ctx.rotate(direction + Math.PI / 2)
+    ctx.fillStyle = 'rgba(42,41,48,.18)'
+    ctx.beginPath()
+    ctx.ellipse(0, radius * 0.65, radius * 0.9, radius * 0.28, 0, 0, Math.PI * 2)
+    ctx.fill()
+
     ctx.strokeStyle = thread.dark
-    ctx.lineWidth = Math.max(1.4, radius * 0.13)
+    ctx.lineWidth = Math.max(1.1, radius * 0.16)
     ctx.lineCap = 'round'
+    ;[-1, 1].forEach((side, index) => {
+      const phase = index === 0 ? step : -step
+      ctx.beginPath()
+      ctx.moveTo(side * radius * 0.42, radius * 0.2)
+      ctx.lineTo(side * radius * (0.58 + phase * 0.12), radius * (0.72 - phase * 0.1))
+      ctx.stroke()
+    })
+
     ctx.beginPath()
     ctx.moveTo(-radius * 0.35, -radius * 0.62)
     ctx.quadraticCurveTo(-radius * 0.8, -radius * 1.05, -radius * 0.56, -radius * 1.25)
@@ -386,6 +421,14 @@ export class BoardRenderer {
     ctx.moveTo(radius * 0.7, radius * 0.25)
     ctx.lineTo(radius * 1.35, -radius * 0.2)
     ctx.stroke()
+    if (carrying) {
+      ctx.fillStyle = thread.hex
+      ctx.strokeStyle = thread.dark
+      ctx.lineWidth = Math.max(0.8, radius * 0.08)
+      this.roundedRect(ctx, -radius * 0.42, -radius * 1.25, radius * 0.84, radius * 0.62, radius * 0.12)
+      ctx.fill()
+      ctx.stroke()
+    }
     ctx.restore()
   }
 }

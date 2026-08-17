@@ -36,6 +36,9 @@ export interface StitchTask {
   color: ThreadColor
   row: number
   col: number
+  workerIndex: number
+  path: Array<{ row: number; col: number }>
+  travelMs: number
 }
 
 export type GamePhase = 'playing' | 'complete' | 'failed'
