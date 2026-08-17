@@ -2,7 +2,7 @@ import { THREAD_COLORS } from '../game/palette'
 import type { GameEngine } from '../game/engine'
 import type { GameSnapshot, SpoolState, ThreadColor } from '../game/types'
 import { t } from '../i18n'
-import { arrowIcon, restartIcon, soundIcon } from './icons'
+import { arrowIcon, restartIcon, revealIcon, soundIcon } from './icons'
 
 export class GameView {
   readonly canvas: HTMLCanvasElement
@@ -90,14 +90,23 @@ export class GameView {
   private renderSlots(snapshot: GameSnapshot): void {
     const items = Array.from({ length: 5 }, (_, index) => {
       const slot = snapshot.slots[index]
-      if (!slot) return `<div class="ss-slot ss-slot--empty" aria-label="${t('slot.empty')}"><span></span></div>`
+      if (!slot) return `
+        <div class="ss-slot ss-slot--empty" aria-label="${t('slot.empty')}">
+          <span class="ss-slot__notch ss-slot__notch--top"></span>
+          <span class="ss-slot__empty-mark"></span>
+          <span class="ss-slot__notch ss-slot__notch--bottom"></span>
+        </div>
+      `
       const thread = THREAD_COLORS[slot.spool.color]
       const stateText = t(slot.state === 'working' ? 'status.working' : 'status.waiting')
       return `
-        <div class="ss-slot ss-slot--${slot.state}" style="--thread:${thread.hex};--thread-dark:${thread.dark}" aria-label="${stateText} ${slot.spool.remaining}">
-          <span class="ss-slot__sprite"><i></i><b></b></span>
+        <div class="ss-slot ss-slot--${slot.state}" style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${stateText} ${slot.spool.remaining}">
+          <span class="ss-slot__notch ss-slot__notch--top"></span>
+          <span class="ss-slot__thread"></span>
+          <span class="ss-color-symbol ss-color-symbol--${thread.symbol}" aria-hidden="true"></span>
           <strong>${slot.spool.remaining}</strong>
           <small>${stateText}</small>
+          <span class="ss-slot__notch ss-slot__notch--bottom"></span>
         </div>
       `
     })
@@ -156,9 +165,12 @@ export class GameView {
       const revealKey = snapshot.level.reveal === 'sprout' ? 'complete.flower' : 'complete.moth'
       this.overlay.innerHTML = `
         <div class="ss-result ss-result--complete" role="dialog" aria-modal="true">
-          <span class="ss-result__sprite" aria-hidden="true"><i></i><b></b></span>
-          <p>${t('complete.title')}</p>
-          <h2>${t(revealKey)}</h2>
+          <span class="ss-result__badge ss-result__badge--complete" aria-hidden="true">${revealIcon(snapshot.level.reveal)}</span>
+          <div class="ss-result__copy">
+            <span class="ss-result__eyebrow">${t('complete.title')}</span>
+            <p>${t('complete.reveal')}</p>
+            <h2>${t(revealKey)}</h2>
+          </div>
           <button class="ss-primary" type="button">${snapshot.level.id < 2 ? t('action.next') : t('action.again')} ${arrowIcon}</button>
         </div>
       `
@@ -167,10 +179,12 @@ export class GameView {
       const colors = engine.currentNeededColors().map((color: ThreadColor) => t(`color.${color}`)).join('、')
       this.overlay.innerHTML = `
         <div class="ss-result ss-result--failed" role="dialog" aria-modal="true">
-          <span class="ss-knot" aria-hidden="true"></span>
-          <h2>${t('fail.title')}</h2>
-          <p>${t('fail.body')}</p>
-          <small>${t('fail.need', { colors })}</small>
+          <span class="ss-result__badge ss-result__badge--failed" aria-hidden="true"><span class="ss-knot"></span></span>
+          <div class="ss-result__copy">
+            <span class="ss-result__eyebrow">${t('fail.title')}</span>
+            <p>${t('fail.body')}</p>
+            <small>${t('fail.need', { colors })}</small>
+          </div>
           <button class="ss-primary" type="button">${restartIcon} ${t('action.restart')}</button>
         </div>
       `

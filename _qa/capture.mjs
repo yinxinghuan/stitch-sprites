@@ -52,7 +52,9 @@ async function selectPath(page, columns) {
     await spool.waitFor({ state: 'visible' })
     await spool.click()
     await page.waitForTimeout(120)
-    await page.waitForFunction(() => document.querySelectorAll('.ss-slot--working').length === 0, null, { timeout: 20000 })
+    // A full 108-stitch reel now releases larger workers with an 82ms queue cadence;
+    // nine visible waves can legitimately take a little over the old 20s ceiling.
+    await page.waitForFunction(() => document.querySelectorAll('.ss-slot--working').length === 0, null, { timeout: 30000 })
   }
 }
 

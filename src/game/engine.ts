@@ -149,8 +149,8 @@ export class GameEngine {
           reserved.add(`${target.row}:${target.col}`)
           const paceVariation = ((workerIndex * 17 + target.row * 3 + target.col) % 7 - 3) * 14
           const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18 + paceVariation))
-          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 5
-          const departMs = workerIndex * 52 + queueJitter
+          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 6
+          const departMs = workerIndex * 82 + queueJitter
           tasks.push({
             slotId: slot.slotId,
             color: slot.spool.color,
