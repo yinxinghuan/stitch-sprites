@@ -24,7 +24,7 @@ const initial = await remaining()
 if (initial !== 792) throw new Error(`Expected 792 initial stitches, got ${initial}`)
 
 await page.locator('[data-column="0"]').click()
-const checkpoints = [0, 140, 320, 520, 700, 850, 1050, 1300]
+const checkpoints = [0, 160, 340, 460, 540, 620, 720, 860, 1020, 1220, 1450]
 let elapsed = 0
 const readings = []
 for (const checkpoint of checkpoints) {
@@ -35,13 +35,14 @@ for (const checkpoint of checkpoints) {
   await page.screenshot({ path: path.join(outputDir, `${pass}-${String(checkpoint).padStart(4, '0')}ms-390x844.png`) })
 }
 
-if (readings[1].remaining !== initial) {
+if (readings.find(({ checkpoint }) => checkpoint === 340)?.remaining !== initial) {
   throw new Error(`Stitches changed before the first visible walking beat: ${JSON.stringify(readings)}`)
 }
-if (!(readings[3].remaining < initial)) {
+const firstResult = readings.find(({ checkpoint }) => checkpoint === 720)?.remaining ?? initial
+if (!(firstResult < initial)) {
   throw new Error(`No visible work result after arrival: ${JSON.stringify(readings)}`)
 }
-if (!(readings.at(-1).remaining < readings[3].remaining)) {
+if (!(readings.at(-1).remaining < firstResult)) {
   throw new Error(`Workers did not continue after first contact: ${JSON.stringify(readings)}`)
 }
 

@@ -7,8 +7,8 @@ interface Mission extends StitchTask {
   returnMs: number
 }
 
-const CONTACT_MS = 100
-const PORTAL_DROP_MS = 180
+const CONTACT_MS = 260
+const PORTAL_DROP_MS = 220
 
 interface BoardGeometry {
   cellSize: number
@@ -52,12 +52,12 @@ export class BoardRenderer {
   }
 
   launch(tasks: StitchTask[]): void {
-    const startedAt = performance.now()
+    const waveStartedAt = performance.now()
     tasks.forEach((task) => {
       this.missions.push({
         ...task,
-        startedAt,
-        returnMs: Math.max(300, task.travelMs * 0.62),
+        startedAt: waveStartedAt + task.departMs,
+        returnMs: Math.max(320, task.travelMs * (0.58 + (task.workerIndex % 3) * 0.015)),
       })
     })
     this.requestDraw()
@@ -421,25 +421,46 @@ export class BoardRenderer {
       const dropProgress = Math.max(0, Math.min(1, (elapsed - dropStart) / PORTAL_DROP_MS))
       const pathProgress = returning ? Math.max(0, 1 - returnProgress) : outboundProgress
       const position = this.sampleWalkPath(mission.path, pathProgress, geo)
-      const ahead = this.sampleWalkPath(mission.path, Math.max(0, Math.min(1, pathProgress + (returning ? -0.02 : 0.02))), geo)
-      const direction = Math.atan2(ahead.y - position.y, ahead.x - position.x)
-      const spread = (mission.workerIndex - 3) * Math.min(0.7, geo.cellSize * 0.08)
-      const x = position.x + Math.cos(direction + Math.PI / 2) * spread
-      const y = position.y + Math.sin(direction + Math.PI / 2) * spread
-      const gait = elapsed / 115 + mission.workerIndex * 0.7
+      const tangentProgress = returning
+        ? Math.max(0, pathProgress - 0.025)
+        : Math.min(1, pathProgress + 0.025)
+      const tangent = this.sampleWalkPath(mission.path, tangentProgress, geo)
+      const fallbackProgress = returning
+        ? Math.min(1, pathProgress + 0.025)
+        : Math.max(0, pathProgress - 0.025)
+      const fallback = this.sampleWalkPath(mission.path, fallbackProgress, geo)
+      const direction = tangent.x === position.x && tangent.y === position.y
+        ? Math.atan2(position.y - fallback.y, position.x - fallback.x)
+        : Math.atan2(tangent.y - position.y, tangent.x - position.x)
+      const lane = (mission.workerIndex % 5) - 2
+      const spread = lane * Math.min(2.15, geo.cellSize * 0.24)
+      const wander = this.reducedMotion ? 0 : Math.sin(elapsed / (94 + mission.workerIndex % 4 * 9) + mission.workerIndex * 1.7) * Math.min(0.7, geo.cellSize * 0.075)
+      const formation = Math.min(1, pathProgress * 5)
+      const lateralOffset = (spread + wander) * formation
+      const x = position.x + Math.cos(direction + Math.PI / 2) * lateralOffset
+      const y = position.y + Math.sin(direction + Math.PI / 2) * lateralOffset
+      const gait = elapsed / (108 + mission.workerIndex % 4 * 8) + mission.workerIndex * 0.73
       ctx.save()
-      const radius = Math.max(4.8, geo.cellSize * 0.88)
+      const sizeVariation = 0.92 + ((mission.workerIndex * 7) % 5) * 0.04
+      const radius = Math.max(4.8, geo.cellSize * 0.88 * sizeVariation)
       const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
-      if (!returning && elapsed >= mission.travelMs) this.drawExtraction(ctx, x, y, radius, mission.color, contactProgress)
+      const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
+      const targetY = geo.top + (mission.row + 0.5) * geo.cellSize
+      const spriteDirection = !returning && elapsed >= mission.travelMs
+        ? Math.atan2(targetY - y, targetX - x)
+        : direction
       if (dropping) {
         const easedDrop = dropProgress * dropProgress
         ctx.globalAlpha = 1 - dropProgress
         ctx.translate(x, y + easedDrop * radius * 2.2)
         ctx.scale(1 - dropProgress * 0.58, 1 - dropProgress * 0.58)
         this.drawPortalDrop(ctx, radius, mission.color, dropProgress)
-        this.drawSprite(ctx, 0, 0, radius, mission.color, gait, direction, true)
+        this.drawSprite(ctx, 0, 0, radius, mission.color, gait, spriteDirection, true, 0)
       } else {
-        this.drawSprite(ctx, x, y, radius, mission.color, gait, direction, returning)
+        this.drawSprite(ctx, x, y, radius, mission.color, gait, spriteDirection, returning, elapsed >= mission.travelMs ? contactProgress : 0)
+        if (!returning && elapsed >= mission.travelMs) {
+          this.drawExtraction(ctx, targetX, targetY, x, y, radius, mission.color, contactProgress)
+        }
       }
       ctx.restore()
     })
@@ -447,39 +468,100 @@ export class BoardRenderer {
 
   private drawExtraction(
     ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
+    targetX: number,
+    targetY: number,
+    workerX: number,
+    workerY: number,
     radius: number,
     color: ThreadColor,
     progress: number,
   ): void {
     const thread = THREAD_COLORS[color]
-    const size = radius * (1.15 - progress * 0.5)
+    const lift = 1 - Math.pow(1 - Math.min(1, progress / 0.48), 3)
+    const coil = Math.max(0, Math.min(1, (progress - 0.28) / 0.72))
+    const pullAngle = Math.atan2(workerY - targetY, workerX - targetX)
+    const shake = this.reducedMotion ? 0 : Math.sin(progress * Math.PI * 9) * radius * 0.13 * (1 - coil)
+    const sideX = Math.cos(pullAngle + Math.PI / 2)
+    const sideY = Math.sin(pullAngle + Math.PI / 2)
+    const bundleX = Math.cos(pullAngle) * radius * (0.25 + lift * 0.9) + sideX * shake
+    const bundleY = Math.sin(pullAngle) * radius * (0.25 + lift * 0.9) + sideY * shake
+    const size = radius * (0.78 - coil * 0.52)
     ctx.save()
-    ctx.translate(x, y - progress * radius * 0.5)
-    ctx.rotate(progress * 0.35)
-    ctx.globalAlpha = 1 - progress * 0.25
+    ctx.translate(targetX, targetY)
     ctx.strokeStyle = thread.hex
-    ctx.lineWidth = Math.max(1.2, radius * 0.24)
+    ctx.lineWidth = Math.max(1.2, radius * 0.22)
     ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    if (progress > 0.46) {
+      const release = Math.min(1, (progress - 0.46) / 0.54)
+      ctx.globalAlpha = Math.sin(release * Math.PI) * 0.85
+      ctx.strokeStyle = '#fff7e7'
+      ctx.lineWidth = Math.max(1.15, radius * 0.14)
+      ctx.beginPath()
+      ctx.arc(0, 0, radius * (0.42 + release * 0.72), 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      ctx.strokeStyle = thread.hex
+    }
+
+    // The two cross-stitch strands visibly lift out of the fabric before coiling.
     ctx.beginPath()
     ctx.moveTo(-size, -size)
-    ctx.lineTo(size, size)
+    ctx.quadraticCurveTo(sideX * radius * 0.42, sideY * radius * 0.42, bundleX, bundleY)
     ctx.moveTo(size, -size)
-    ctx.lineTo(-size, size)
+    ctx.quadraticCurveTo(-sideX * radius * 0.42, -sideY * radius * 0.42, bundleX, bundleY)
+    ctx.moveTo(-size, size)
+    ctx.quadraticCurveTo(sideX * radius * 0.3, sideY * radius * 0.3, bundleX, bundleY)
+    ctx.moveTo(size, size)
+    ctx.quadraticCurveTo(-sideX * radius * 0.3, -sideY * radius * 0.3, bundleX, bundleY)
     ctx.stroke()
+
+    ctx.globalAlpha = 0.95
+    ctx.fillStyle = thread.hex
+    ctx.strokeStyle = thread.dark
+    ctx.lineWidth = Math.max(0.9, radius * 0.1)
+    ctx.beginPath()
+    ctx.arc(bundleX, bundleY, radius * (0.24 + coil * 0.62), 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    if (coil > 0.08) {
+      ctx.strokeStyle = thread.light
+      ctx.lineWidth = Math.max(0.75, radius * 0.075)
+      ctx.beginPath()
+      ctx.arc(bundleX, bundleY, radius * (0.08 + coil * 0.2), -Math.PI * 0.35, Math.PI * (1.2 + coil))
+      ctx.stroke()
+    }
+
+    // A few fixed fibres sell the release without a particle system.
+    ctx.globalAlpha = Math.sin(progress * Math.PI) * 0.8
+    ctx.strokeStyle = thread.light
+    ctx.lineWidth = Math.max(0.7, radius * 0.065)
+    for (let index = 0; index < 3; index += 1) {
+      const angle = -2.45 + index * 0.8
+      const distance = radius * (0.65 + progress * 0.55)
+      ctx.beginPath()
+      ctx.moveTo(bundleX + Math.cos(angle) * radius * 0.28, bundleY + Math.sin(angle) * radius * 0.28)
+      ctx.lineTo(bundleX + Math.cos(angle) * distance, bundleY + Math.sin(angle) * distance)
+      ctx.stroke()
+    }
     ctx.restore()
   }
 
   private drawPortalDrop(ctx: CanvasRenderingContext2D, radius: number, color: ThreadColor, progress: number): void {
     const thread = THREAD_COLORS[color]
     ctx.save()
-    ctx.globalAlpha = 0.7 * (1 - progress)
+    ctx.globalAlpha = 0.85 * (1 - progress)
     ctx.strokeStyle = thread.hex
     ctx.lineWidth = Math.max(1, radius * 0.14)
     ctx.beginPath()
     ctx.moveTo(-radius * 0.7, -radius * 0.6)
     ctx.quadraticCurveTo(0, radius * (0.2 + progress), radius * 0.45, radius * 1.35)
+    ctx.stroke()
+    ctx.globalAlpha = 0.5 * (1 - progress)
+    ctx.strokeStyle = thread.light
+    ctx.beginPath()
+    ctx.arc(0, radius * 0.95, radius * (0.42 + progress * 0.38), 0.2, Math.PI * 1.55)
     ctx.stroke()
     ctx.restore()
   }
@@ -512,13 +594,15 @@ export class BoardRenderer {
     gait: number,
     direction: number,
     carrying: boolean,
+    pullProgress: number,
   ): void {
     const thread = THREAD_COLORS[color]
     const step = this.reducedMotion ? 0 : Math.sin(gait * Math.PI * 2)
-    y += Math.abs(step) * -radius * 0.08
+    const tug = this.reducedMotion ? 0 : Math.sin(Math.min(1, pullProgress) * Math.PI)
+    y += Math.abs(step) * -radius * 0.08 + tug * radius * 0.12
     ctx.save()
     ctx.translate(x, y)
-    ctx.rotate(direction + Math.PI / 2)
+    ctx.rotate(direction + Math.PI / 2 + tug * 0.13)
     ctx.fillStyle = 'rgba(42,41,48,.18)'
     ctx.beginPath()
     ctx.ellipse(0, radius * 0.65, radius * 0.9, radius * 0.28, 0, 0, Math.PI * 2)
@@ -541,11 +625,22 @@ export class BoardRenderer {
     ctx.moveTo(radius * 0.25, -radius * 0.7)
     ctx.quadraticCurveTo(radius * 0.55, -radius * 1.12, radius * 0.78, -radius * 1.04)
     ctx.stroke()
+    ctx.fillStyle = thread.light
+    ctx.beginPath()
+    ctx.arc(-radius * 0.56, -radius * 1.25, radius * 0.13, 0, Math.PI * 2)
+    ctx.arc(radius * 0.78, -radius * 1.04, radius * 0.13, 0, Math.PI * 2)
+    ctx.fill()
     ctx.fillStyle = thread.hex
     ctx.beginPath()
     ctx.ellipse(0, 0, radius * 0.9, radius * 0.78, -0.1, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
+    // Large pale bib + unique symbol keeps workers identifiable beyond hue alone.
+    ctx.fillStyle = 'rgba(255,253,245,.86)'
+    ctx.beginPath()
+    ctx.ellipse(0, radius * 0.28, radius * 0.48, radius * 0.31, -0.08, 0, Math.PI * 2)
+    ctx.fill()
+    this.drawSymbol(ctx, color, 0, radius * 0.3, radius * 0.34)
     ctx.fillStyle = '#fffdf5'
     ctx.beginPath()
     ctx.arc(-radius * 0.28, -radius * 0.12, radius * 0.17, 0, Math.PI * 2)
@@ -566,8 +661,13 @@ export class BoardRenderer {
       ctx.fillStyle = thread.hex
       ctx.strokeStyle = thread.dark
       ctx.lineWidth = Math.max(0.8, radius * 0.08)
-      this.roundedRect(ctx, -radius * 0.42, -radius * 1.25, radius * 0.84, radius * 0.62, radius * 0.12)
+      ctx.beginPath()
+      ctx.arc(0, -radius * 0.94, radius * 0.46, 0, Math.PI * 2)
       ctx.fill()
+      ctx.stroke()
+      ctx.strokeStyle = thread.light
+      ctx.beginPath()
+      ctx.arc(0, -radius * 0.94, radius * 0.23, -0.45, Math.PI * 1.4)
       ctx.stroke()
     }
     ctx.restore()

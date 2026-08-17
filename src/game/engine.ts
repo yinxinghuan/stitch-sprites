@@ -9,6 +9,7 @@ interface EngineHooks {
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms))
+const RELEASE_MS = 130
 
 export class GameEngine {
   readonly audio = new GameAudio()
@@ -146,7 +147,10 @@ export class GameEngine {
           if (!path.length) break
           foundTarget = true
           reserved.add(`${target.row}:${target.col}`)
-          const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18))
+          const paceVariation = ((workerIndex * 17 + target.row * 3 + target.col) % 7 - 3) * 14
+          const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18 + paceVariation))
+          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 5
+          const departMs = workerIndex * 52 + queueJitter
           tasks.push({
             slotId: slot.slotId,
             color: slot.spool.color,
@@ -154,6 +158,7 @@ export class GameEngine {
             col: target.col,
             workerIndex,
             path,
+            departMs,
             travelMs,
           })
         }
@@ -183,7 +188,7 @@ export class GameEngine {
       this.audio.depart()
       this.emit()
       await Promise.all(tasks.map(async (task) => {
-        await delay(task.travelMs)
+        await delay(task.departMs + task.travelMs + RELEASE_MS)
         if (runGeneration !== this.generation) return
         const cell = this.cells[task.row]?.[task.col]
         const slot = this.slots.find((candidate) => candidate.slotId === task.slotId)

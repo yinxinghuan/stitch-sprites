@@ -38,6 +38,7 @@ export interface StitchTask {
   col: number
   workerIndex: number
   path: Array<{ row: number; col: number }>
+  departMs: number
   travelMs: number
 }
 
