@@ -6,7 +6,7 @@ export const LEVELS: LevelDefinition[] = [
     id: 1,
     titleKey: 'level.flower',
     reveal: 'sprout',
-    density: 2,
+    density: 3,
     tutorial: true,
     rows: [
       '..YYYYYY..',
@@ -45,7 +45,7 @@ export const LEVELS: LevelDefinition[] = [
     id: 2,
     titleKey: 'level.moth',
     reveal: 'moth',
-    density: 2,
+    density: 3,
     tutorial: false,
     rows: [
       '..PPPPPPPPPP..',

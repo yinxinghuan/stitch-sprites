@@ -42,11 +42,12 @@ export class BoardRenderer {
 
   launch(tasks: StitchTask[]): void {
     const startedAt = performance.now()
+    const density = this.snapshot?.level.density ?? 1
     tasks.forEach((task, index) => {
       this.missions.push({
         ...task,
         startedAt: startedAt + index * 16,
-        duration: this.reducedMotion ? 36 : 70,
+        duration: this.reducedMotion ? 30 : Math.max(42, 140 / density),
       })
     })
   }
@@ -71,7 +72,7 @@ export class BoardRenderer {
     const cols = this.snapshot.cells[0]?.length ?? 0
     if (!rows || !cols) return null
     const available = Math.min(this.width - 48, this.height - 58)
-    const cellSize = Math.floor(available / Math.max(rows, cols))
+    const cellSize = available / Math.max(rows, cols)
     const width = cols * cellSize
     const height = rows * cellSize
     return {
@@ -248,7 +249,7 @@ export class BoardRenderer {
       const centerX = geo.left + (colIndex + 0.5) * geo.cellSize
       const centerY = geo.top + (rowIndex + 0.5) * geo.cellSize
       const accessible = this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))
-      this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.96, accessible, pulse)
+      this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.985, accessible, pulse)
     }))
   }
 
@@ -275,12 +276,12 @@ export class BoardRenderer {
       ctx.shadowOffsetY = 0.7
     }
     ctx.fillStyle = thread.dark
-    this.roundedRect(ctx, left, top, size, size, size * 0.1)
+    this.roundedRect(ctx, left, top, size, size, size * 0.06)
     ctx.fill()
 
     ctx.shadowColor = 'transparent'
     ctx.lineCap = 'round'
-    ctx.lineWidth = Math.max(1.2, size * 0.26)
+    ctx.lineWidth = Math.max(0.8, size * 0.24)
     ctx.strokeStyle = thread.hex
     ctx.beginPath()
     ctx.moveTo(left + pad, top + pad)
@@ -289,7 +290,7 @@ export class BoardRenderer {
     ctx.lineTo(left + pad, top + size - pad)
     ctx.stroke()
 
-    ctx.lineWidth = Math.max(0.55, size * 0.055)
+    ctx.lineWidth = Math.max(0.45, size * 0.055)
     ctx.strokeStyle = thread.light
     ctx.beginPath()
     ctx.moveTo(left + pad + 0.7, top + pad)

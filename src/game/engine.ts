@@ -106,6 +106,9 @@ export class GameEngine {
     if (this.busy || this.phase !== 'playing') return
     this.busy = true
     const runGeneration = this.generation
+    const densityScale = this.level.density * this.level.density
+    const travelDelay = Math.max(14, Math.round(130 / densityScale))
+    const settleDelay = Math.max(9, Math.round(80 / densityScale))
 
     while (this.phase === 'playing' && runGeneration === this.generation) {
       const reachable = findReachable(this.cells)
@@ -138,11 +141,11 @@ export class GameEngine {
 
       this.messageKey = this.slots.length >= 4
         ? 'hint.danger'
-        : (this.level.tutorial && this.removed < 40 ? 'hint.first' : 'hint.normal')
+        : (this.level.tutorial && this.removed < 10 * densityScale ? 'hint.first' : 'hint.normal')
       this.hooks.onTasks(tasks)
       this.audio.depart()
       this.emit()
-      await delay(34)
+      await delay(travelDelay)
       if (runGeneration !== this.generation) return
 
       tasks.forEach((task) => {
@@ -152,10 +155,10 @@ export class GameEngine {
         cell.cleared = true
         slot.spool.remaining -= 1
         this.removed += 1
-        this.audio.unstitch()
+        if (this.removed % this.level.density === 0) this.audio.unstitch()
       })
       this.emit()
-      await delay(18)
+      await delay(settleDelay)
       if (runGeneration !== this.generation) return
 
       this.slots = this.slots.filter((slot) => slot.spool.remaining > 0)
