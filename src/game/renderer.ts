@@ -248,11 +248,11 @@ export class BoardRenderer {
       const centerX = geo.left + (colIndex + 0.5) * geo.cellSize
       const centerY = geo.top + (rowIndex + 0.5) * geo.cellSize
       const accessible = this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))
-      this.drawParticle(ctx, cell.color, centerX, centerY, geo.cellSize * 0.52, accessible, pulse)
+      this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.74, accessible, pulse)
     }))
   }
 
-  private drawParticle(
+  private drawStitchTile(
     ctx: CanvasRenderingContext2D,
     color: ThreadColor,
     x: number,
@@ -262,45 +262,61 @@ export class BoardRenderer {
     pulse: number,
   ): void {
     const thread = THREAD_COLORS[color]
-    const symbol = thread.symbol
+    const left = x - size / 2
+    const top = y - size / 2
+    const pad = size * 0.16
     ctx.save()
-    ctx.fillStyle = thread.hex
-    ctx.strokeStyle = thread.dark
-    ctx.lineWidth = Math.max(1, size * 0.12)
-    ctx.lineJoin = 'round'
     if (accessible) {
-      ctx.shadowColor = `rgba(255,255,255,${0.55 + pulse * 0.35})`
-      ctx.shadowBlur = 4 + pulse * 4
+      ctx.shadowColor = `rgba(255,255,255,${0.45 + pulse * 0.35})`
+      ctx.shadowBlur = 6 + pulse * 4
     } else {
       ctx.shadowColor = 'rgba(47,38,48,.22)'
-      ctx.shadowBlur = 2
-      ctx.shadowOffsetY = 1
+      ctx.shadowBlur = 3
+      ctx.shadowOffsetY = 1.5
     }
+    ctx.fillStyle = thread.dark
+    this.roundedRect(ctx, left, top, size, size, size * 0.18)
+    ctx.fill()
+
+    ctx.shadowColor = 'transparent'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = Math.max(3, size * 0.26)
+    ctx.strokeStyle = thread.hex
+    ctx.beginPath()
+    ctx.moveTo(left + pad, top + pad)
+    ctx.lineTo(left + size - pad, top + size - pad)
+    ctx.moveTo(left + size - pad, top + pad)
+    ctx.lineTo(left + pad, top + size - pad)
+    ctx.stroke()
+
+    ctx.lineWidth = Math.max(1, size * 0.055)
+    ctx.strokeStyle = thread.light
+    ctx.beginPath()
+    ctx.moveTo(left + pad + 0.7, top + pad)
+    ctx.lineTo(left + size - pad, top + size - pad - 0.7)
+    ctx.stroke()
+    this.drawSymbol(ctx, color, x, y, size * 0.12)
+    ctx.restore()
+  }
+
+  private drawSymbol(ctx: CanvasRenderingContext2D, color: ThreadColor, x: number, y: number, size: number): void {
+    const symbol = THREAD_COLORS[color].symbol
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'
+    ctx.fillStyle = 'rgba(255,255,255,.9)'
+    ctx.lineWidth = Math.max(1, size * 0.32)
     if (symbol === 'circle') {
-      ctx.beginPath(); ctx.arc(x, y, size * 0.48, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+      ctx.beginPath(); ctx.arc(x, y, size * 0.52, 0, Math.PI * 2); ctx.fill()
     } else if (symbol === 'ring') {
-      ctx.beginPath(); ctx.arc(x, y, size * 0.48, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-      ctx.shadowColor = 'transparent'
-      ctx.fillStyle = '#fff9ec'
-      ctx.beginPath(); ctx.arc(x, y, size * 0.17, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(x, y, size * 0.58, 0, Math.PI * 2); ctx.stroke()
     } else if (symbol === 'diamond') {
-      ctx.beginPath(); ctx.moveTo(x, y - size * 0.52); ctx.lineTo(x + size * 0.52, y); ctx.lineTo(x, y + size * 0.52); ctx.lineTo(x - size * 0.52, y); ctx.closePath(); ctx.fill(); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.7); ctx.lineTo(x + size * 0.7, y); ctx.lineTo(x, y + size * 0.7); ctx.lineTo(x - size * 0.7, y); ctx.closePath(); ctx.fill()
     } else if (symbol === 'triangle') {
-      ctx.beginPath(); ctx.moveTo(x, y - size * 0.52); ctx.lineTo(x + size * 0.52, y + size * 0.42); ctx.lineTo(x - size * 0.52, y + size * 0.42); ctx.closePath(); ctx.fill(); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.72); ctx.lineTo(x + size * 0.72, y + size * 0.55); ctx.lineTo(x - size * 0.72, y + size * 0.55); ctx.closePath(); ctx.fill()
     } else if (symbol === 'bar') {
-      this.roundedRect(ctx, x - size * 0.55, y - size * 0.3, size * 1.1, size * 0.6, size * 0.3)
-      ctx.fill(); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x - size * 0.7, y); ctx.lineTo(x + size * 0.7, y); ctx.stroke()
     } else {
-      const sides = 6
-      ctx.beginPath()
-      for (let index = 0; index < sides; index += 1) {
-        const angle = -Math.PI / 2 + index * Math.PI * 2 / sides
-        const px = x + Math.cos(angle) * size * 0.5
-        const py = y + Math.sin(angle) * size * 0.5
-        if (index === 0) ctx.moveTo(px, py)
-        else ctx.lineTo(px, py)
-      }
-      ctx.closePath(); ctx.fill(); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(x - size * 0.55, y - size * 0.55); ctx.lineTo(x + size * 0.55, y + size * 0.55); ctx.moveTo(x + size * 0.55, y - size * 0.55); ctx.lineTo(x - size * 0.55, y + size * 0.55); ctx.stroke()
     }
     ctx.restore()
   }
