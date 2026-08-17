@@ -6,6 +6,7 @@ export const LEVELS: LevelDefinition[] = [
     id: 1,
     titleKey: 'level.flower',
     reveal: 'sprout',
+    density: 2,
     tutorial: true,
     rows: [
       '..YYYYYY..',
@@ -44,6 +45,7 @@ export const LEVELS: LevelDefinition[] = [
     id: 2,
     titleKey: 'level.moth',
     reveal: 'moth',
+    density: 2,
     tutorial: false,
     rows: [
       '..PPPPPPPPPP..',
@@ -95,14 +97,21 @@ export const LEVELS: LevelDefinition[] = [
 ]
 
 export function createCells(level: LevelDefinition): Cell[][] {
-  return level.rows.map((row) => [...row].map((code) => ({
-    color: code === '.' ? null : CODE_TO_COLOR[code] ?? null,
-    cleared: false,
-  })))
+  return level.rows.flatMap((row) => Array.from({ length: level.density }, () => (
+    [...row].flatMap((code) => Array.from({ length: level.density }, () => ({
+      color: code === '.' ? null : CODE_TO_COLOR[code] ?? null,
+      cleared: false,
+    })))
+  )))
 }
 
 export function createColumns(level: LevelDefinition): SpoolState[][] {
-  return level.columns.map((column) => column.map((spool) => ({ ...spool, remaining: spool.capacity })))
+  const capacityScale = level.density * level.density
+  return level.columns.map((column) => column.map((spool) => ({
+    ...spool,
+    capacity: spool.capacity * capacityScale,
+    remaining: spool.capacity * capacityScale,
+  })))
 }
 
 function countCells(level: LevelDefinition): Map<ThreadColor, number> {
@@ -117,7 +126,7 @@ export function validateLevels(): void {
   LEVELS.forEach((level) => {
     const cells = countCells(level)
     const spools = new Map<ThreadColor, number>()
-    level.columns.flat().forEach((spool) => {
+    createColumns(level).flat().forEach((spool) => {
       spools.set(spool.color, (spools.get(spool.color) ?? 0) + spool.capacity)
     })
     cells.forEach((count, color) => {

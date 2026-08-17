@@ -138,11 +138,11 @@ export class GameEngine {
 
       this.messageKey = this.slots.length >= 4
         ? 'hint.danger'
-        : (this.level.tutorial && this.removed < 10 ? 'hint.first' : 'hint.normal')
+        : (this.level.tutorial && this.removed < 40 ? 'hint.first' : 'hint.normal')
       this.hooks.onTasks(tasks)
       this.audio.depart()
       this.emit()
-      await delay(145)
+      await delay(34)
       if (runGeneration !== this.generation) return
 
       tasks.forEach((task) => {
@@ -155,7 +155,7 @@ export class GameEngine {
         this.audio.unstitch()
       })
       this.emit()
-      await delay(115)
+      await delay(18)
       if (runGeneration !== this.generation) return
 
       this.slots = this.slots.filter((slot) => slot.spool.remaining > 0)

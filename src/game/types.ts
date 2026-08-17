@@ -19,6 +19,7 @@ export interface LevelDefinition {
   id: number
   titleKey: string
   reveal: 'sprout' | 'moth'
+  density: number
   rows: string[]
   columns: SpoolDefinition[][]
   tutorial: boolean
@@ -50,4 +51,3 @@ export interface GameSnapshot {
   reachable: Set<string>
   messageKey: string
 }
-

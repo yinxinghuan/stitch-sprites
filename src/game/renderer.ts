@@ -46,7 +46,7 @@ export class BoardRenderer {
       this.missions.push({
         ...task,
         startedAt: startedAt + index * 16,
-        duration: this.reducedMotion ? 80 : 240,
+        duration: this.reducedMotion ? 36 : 70,
       })
     })
   }
@@ -248,7 +248,7 @@ export class BoardRenderer {
       const centerX = geo.left + (colIndex + 0.5) * geo.cellSize
       const centerY = geo.top + (rowIndex + 0.5) * geo.cellSize
       const accessible = this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))
-      this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.74, accessible, pulse)
+      this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.96, accessible, pulse)
     }))
   }
 
@@ -268,19 +268,19 @@ export class BoardRenderer {
     ctx.save()
     if (accessible) {
       ctx.shadowColor = `rgba(255,255,255,${0.45 + pulse * 0.35})`
-      ctx.shadowBlur = 6 + pulse * 4
+      ctx.shadowBlur = 2 + pulse * 2
     } else {
       ctx.shadowColor = 'rgba(47,38,48,.22)'
-      ctx.shadowBlur = 3
-      ctx.shadowOffsetY = 1.5
+      ctx.shadowBlur = 1.5
+      ctx.shadowOffsetY = 0.7
     }
     ctx.fillStyle = thread.dark
-    this.roundedRect(ctx, left, top, size, size, size * 0.18)
+    this.roundedRect(ctx, left, top, size, size, size * 0.1)
     ctx.fill()
 
     ctx.shadowColor = 'transparent'
     ctx.lineCap = 'round'
-    ctx.lineWidth = Math.max(3, size * 0.26)
+    ctx.lineWidth = Math.max(1.2, size * 0.26)
     ctx.strokeStyle = thread.hex
     ctx.beginPath()
     ctx.moveTo(left + pad, top + pad)
@@ -289,13 +289,13 @@ export class BoardRenderer {
     ctx.lineTo(left + pad, top + size - pad)
     ctx.stroke()
 
-    ctx.lineWidth = Math.max(1, size * 0.055)
+    ctx.lineWidth = Math.max(0.55, size * 0.055)
     ctx.strokeStyle = thread.light
     ctx.beginPath()
     ctx.moveTo(left + pad + 0.7, top + pad)
     ctx.lineTo(left + size - pad, top + size - pad - 0.7)
     ctx.stroke()
-    this.drawSymbol(ctx, color, x, y, size * 0.12)
+    if (size >= 9) this.drawSymbol(ctx, color, x, y, size * 0.12)
     ctx.restore()
   }
 
