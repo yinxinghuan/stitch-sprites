@@ -7,6 +7,9 @@ interface Mission extends StitchTask {
   returnMs: number
 }
 
+const CONTACT_MS = 100
+const PORTAL_DROP_MS = 180
+
 interface BoardGeometry {
   cellSize: number
   left: number
@@ -17,27 +20,35 @@ interface BoardGeometry {
 
 export class BoardRenderer {
   private readonly context: CanvasRenderingContext2D
+  private readonly staticCanvas = document.createElement('canvas')
+  private readonly staticContext: CanvasRenderingContext2D
   private snapshot: GameSnapshot | null = null
   private missions: Mission[] = []
   private dpr = 1
   private width = 0
   private height = 0
   private frame = 0
+  private staticDirty = true
+  private destroyed = false
   private resizeObserver: ResizeObserver
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d')
+    const staticContext = this.staticCanvas.getContext('2d')
     if (!context) throw new Error('Canvas 2D is unavailable')
+    if (!staticContext) throw new Error('Canvas 2D cache is unavailable')
     this.context = context
+    this.staticContext = staticContext
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
     this.resize()
-    this.frame = requestAnimationFrame((time) => this.draw(time))
   }
 
   setSnapshot(snapshot: GameSnapshot): void {
     this.snapshot = snapshot
+    this.staticDirty = true
+    this.requestDraw()
   }
 
   launch(tasks: StitchTask[]): void {
@@ -49,11 +60,13 @@ export class BoardRenderer {
         returnMs: Math.max(300, task.travelMs * 0.62),
       })
     })
+    this.requestDraw()
   }
 
   destroy(): void {
+    this.destroyed = true
     this.resizeObserver.disconnect()
-    cancelAnimationFrame(this.frame)
+    if (this.frame) cancelAnimationFrame(this.frame)
   }
 
   private resize(): void {
@@ -61,8 +74,15 @@ export class BoardRenderer {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2)
     this.width = Math.max(1, rect.width)
     this.height = Math.max(1, rect.height)
-    this.canvas.width = Math.round(this.width * this.dpr)
-    this.canvas.height = Math.round(this.height * this.dpr)
+    const pixelWidth = Math.round(this.width * this.dpr)
+    const pixelHeight = Math.round(this.height * this.dpr)
+    if (this.canvas.width === pixelWidth && this.canvas.height === pixelHeight) return
+    this.canvas.width = pixelWidth
+    this.canvas.height = pixelHeight
+    this.staticCanvas.width = pixelWidth
+    this.staticCanvas.height = pixelHeight
+    this.staticDirty = true
+    this.requestDraw()
   }
 
   private geometry(): BoardGeometry | null {
@@ -83,8 +103,13 @@ export class BoardRenderer {
     }
   }
 
-  private draw(time: number): void {
-    const ctx = this.context
+  private requestDraw(): void {
+    if (this.frame || this.destroyed) return
+    this.frame = requestAnimationFrame((time) => this.draw(time))
+  }
+
+  private redrawStatic(): void {
+    const ctx = this.staticContext
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
     const geometry = this.geometry()
@@ -92,11 +117,26 @@ export class BoardRenderer {
       this.drawHoop(ctx, geometry)
       this.drawFabric(ctx, geometry)
       this.drawReveal(ctx, geometry)
-      this.drawStitches(ctx, geometry, time)
+      this.drawStitches(ctx, geometry)
+    }
+    this.staticDirty = false
+  }
+
+  private draw(time: number): void {
+    this.frame = 0
+    if (this.destroyed) return
+    const ctx = this.context
+    if (this.staticDirty) this.redrawStatic()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    ctx.drawImage(this.staticCanvas, 0, 0)
+    const geometry = this.geometry()
+    if (this.snapshot && geometry) {
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
       this.drawMissions(ctx, geometry, time)
     }
-    this.missions = this.missions.filter((mission) => time < mission.startedAt + mission.travelMs + 100 + mission.returnMs + 100)
-    this.frame = requestAnimationFrame((nextTime) => this.draw(nextTime))
+    this.missions = this.missions.filter((mission) => time < mission.startedAt + mission.travelMs + CONTACT_MS + mission.returnMs + PORTAL_DROP_MS)
+    if (this.missions.length) this.requestDraw()
   }
 
   private roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
@@ -240,9 +280,13 @@ export class BoardRenderer {
     })
   }
 
-  private drawStitches(ctx: CanvasRenderingContext2D, geo: BoardGeometry, time: number): void {
+  private drawStitches(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
     if (!this.snapshot) return
-    const pulse = 0.5 + Math.sin(time / 320) * 0.5
+    if (this.snapshot.level.density >= 3) {
+      this.drawDenseStitches(ctx, geo)
+      return
+    }
+    const pulse = 0.55
     this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
       if (!cell.color || cell.cleared) return
       const centerX = geo.left + (colIndex + 0.5) * geo.cellSize
@@ -250,6 +294,49 @@ export class BoardRenderer {
       const accessible = this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))
       this.drawStitchTile(ctx, cell.color, centerX, centerY, geo.cellSize * 0.985, accessible, pulse)
     }))
+  }
+
+  private drawDenseStitches(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
+    if (!this.snapshot) return
+    const size = geo.cellSize * 0.985
+    const pad = size * 0.17
+    const tiles = new Map<ThreadColor, Path2D>()
+    const crosses = new Map<ThreadColor, Path2D>()
+    const highlights = new Path2D()
+
+    this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+      if (!cell.color || cell.cleared) return
+      const x = geo.left + (colIndex + 0.5) * geo.cellSize
+      const y = geo.top + (rowIndex + 0.5) * geo.cellSize
+      const left = x - size / 2
+      const top = y - size / 2
+      const tilePath = tiles.get(cell.color) ?? new Path2D()
+      const crossPath = crosses.get(cell.color) ?? new Path2D()
+      tilePath.rect(left, top, size, size)
+      crossPath.moveTo(left + pad, top + pad)
+      crossPath.lineTo(left + size - pad, top + size - pad)
+      crossPath.moveTo(left + size - pad, top + pad)
+      crossPath.lineTo(left + pad, top + size - pad)
+      tiles.set(cell.color, tilePath)
+      crosses.set(cell.color, crossPath)
+      if (this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))) highlights.rect(left + 0.5, top + 0.5, size - 1, size - 1)
+    }))
+
+    tiles.forEach((path, color) => {
+      ctx.fillStyle = THREAD_COLORS[color].dark
+      ctx.fill(path)
+    })
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineWidth = Math.max(0.8, size * 0.23)
+    crosses.forEach((path, color) => {
+      ctx.strokeStyle = THREAD_COLORS[color].hex
+      ctx.stroke(path)
+    })
+    ctx.lineWidth = 0.65
+    ctx.strokeStyle = 'rgba(255,255,255,.72)'
+    ctx.stroke(highlights)
+    ctx.restore()
   }
 
   private drawStitchTile(
@@ -325,11 +412,14 @@ export class BoardRenderer {
     this.missions.forEach((mission) => {
       const elapsed = time - mission.startedAt
       if (elapsed < 0) return
-      const contactMs = 100
-      const returning = elapsed > mission.travelMs + contactMs
+      const returnStart = mission.travelMs + CONTACT_MS
+      const dropStart = returnStart + mission.returnMs
+      const returning = elapsed > returnStart
+      const dropping = elapsed > dropStart
       const outboundProgress = Math.max(0, Math.min(1, elapsed / mission.travelMs))
-      const returnProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs - contactMs) / mission.returnMs))
-      const pathProgress = returning ? 1 - returnProgress : outboundProgress
+      const returnProgress = Math.max(0, Math.min(1, (elapsed - returnStart) / mission.returnMs))
+      const dropProgress = Math.max(0, Math.min(1, (elapsed - dropStart) / PORTAL_DROP_MS))
+      const pathProgress = returning ? Math.max(0, 1 - returnProgress) : outboundProgress
       const position = this.sampleWalkPath(mission.path, pathProgress, geo)
       const ahead = this.sampleWalkPath(mission.path, Math.max(0, Math.min(1, pathProgress + (returning ? -0.02 : 0.02))), geo)
       const direction = Math.atan2(ahead.y - position.y, ahead.x - position.x)
@@ -338,9 +428,60 @@ export class BoardRenderer {
       const y = position.y + Math.sin(direction + Math.PI / 2) * spread
       const gait = elapsed / 115 + mission.workerIndex * 0.7
       ctx.save()
-      this.drawSprite(ctx, x, y, Math.max(4.8, geo.cellSize * 0.88), mission.color, gait, direction, returning)
+      const radius = Math.max(4.8, geo.cellSize * 0.88)
+      const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
+      if (!returning && elapsed >= mission.travelMs) this.drawExtraction(ctx, x, y, radius, mission.color, contactProgress)
+      if (dropping) {
+        const easedDrop = dropProgress * dropProgress
+        ctx.globalAlpha = 1 - dropProgress
+        ctx.translate(x, y + easedDrop * radius * 2.2)
+        ctx.scale(1 - dropProgress * 0.58, 1 - dropProgress * 0.58)
+        this.drawPortalDrop(ctx, radius, mission.color, dropProgress)
+        this.drawSprite(ctx, 0, 0, radius, mission.color, gait, direction, true)
+      } else {
+        this.drawSprite(ctx, x, y, radius, mission.color, gait, direction, returning)
+      }
       ctx.restore()
     })
+  }
+
+  private drawExtraction(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    radius: number,
+    color: ThreadColor,
+    progress: number,
+  ): void {
+    const thread = THREAD_COLORS[color]
+    const size = radius * (1.15 - progress * 0.5)
+    ctx.save()
+    ctx.translate(x, y - progress * radius * 0.5)
+    ctx.rotate(progress * 0.35)
+    ctx.globalAlpha = 1 - progress * 0.25
+    ctx.strokeStyle = thread.hex
+    ctx.lineWidth = Math.max(1.2, radius * 0.24)
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(-size, -size)
+    ctx.lineTo(size, size)
+    ctx.moveTo(size, -size)
+    ctx.lineTo(-size, size)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  private drawPortalDrop(ctx: CanvasRenderingContext2D, radius: number, color: ThreadColor, progress: number): void {
+    const thread = THREAD_COLORS[color]
+    ctx.save()
+    ctx.globalAlpha = 0.7 * (1 - progress)
+    ctx.strokeStyle = thread.hex
+    ctx.lineWidth = Math.max(1, radius * 0.14)
+    ctx.beginPath()
+    ctx.moveTo(-radius * 0.7, -radius * 0.6)
+    ctx.quadraticCurveTo(0, radius * (0.2 + progress), radius * 0.45, radius * 1.35)
+    ctx.stroke()
+    ctx.restore()
   }
 
   private sampleWalkPath(path: Array<{ row: number; col: number }>, progress: number, geo: BoardGeometry): { x: number; y: number } {

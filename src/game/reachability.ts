@@ -18,8 +18,9 @@ export function findReachable(cells: Cell[][]): Set<string> {
     return cell.color === null || cell.cleared
   }
 
-  while (queue.length) {
-    const [row, col] = queue.shift()!
+  let queueIndex = 0
+  while (queueIndex < queue.length) {
+    const [row, col] = queue[queueIndex++]
     directions.forEach(([dr, dc]) => {
       const nextRow = row + dr
       const nextCol = col + dc
@@ -71,21 +72,17 @@ export function chooseReachableCell(
   return candidates[0] ?? null
 }
 
-export function findWalkPath(
+export function createWalkPathfinder(
   cells: Cell[][],
-  target: { row: number; col: number },
-): Array<{ row: number; col: number }> {
+): (target: { row: number; col: number }) => Array<{ row: number; col: number }> {
   const rows = cells.length
   const cols = cells[0]?.length ?? 0
-  if (!rows || !cols) return []
+  if (!rows || !cols) return () => []
 
   const paddedRows = rows + 2
   const paddedCols = cols + 2
   const start: [number, number] = [paddedRows - 1, Math.max(1, Math.min(cols, Math.floor(cols / 2) + 1))]
-  const targetRow = target.row + 1
-  const targetCol = target.col + 1
   const directions = [[-1, 0], [0, -1], [0, 1], [1, 0]] as const
-  const goalKeys = new Set<string>()
 
   const isPassable = (pr: number, pc: number): boolean => {
     if (pr === 0 || pc === 0 || pr === paddedRows - 1 || pc === paddedCols - 1) return true
@@ -93,27 +90,15 @@ export function findWalkPath(
     return Boolean(cell && (cell.color === null || cell.cleared))
   }
 
-  directions.forEach(([dr, dc]) => {
-    const row = targetRow + dr
-    const col = targetCol + dc
-    if (row >= 0 && col >= 0 && row < paddedRows && col < paddedCols && isPassable(row, col)) {
-      goalKeys.add(cellKey(row, col))
-    }
-  })
-  if (!goalKeys.size) return []
-
   const queue: Array<[number, number]> = [start]
   const visited = new Set<string>([cellKey(start[0], start[1])])
   const parent = new Map<string, string>()
-  let goal: string | null = null
+  const distance = new Map<string, number>([[cellKey(start[0], start[1]), 0]])
 
-  while (queue.length) {
-    const [row, col] = queue.shift()!
+  let queueIndex = 0
+  while (queueIndex < queue.length) {
+    const [row, col] = queue[queueIndex++]
     const key = cellKey(row, col)
-    if (goalKeys.has(key)) {
-      goal = key
-      break
-    }
     directions.forEach(([dr, dc]) => {
       const nextRow = row + dr
       const nextCol = col + dc
@@ -122,17 +107,31 @@ export function findWalkPath(
       if (visited.has(nextKey) || !isPassable(nextRow, nextCol)) return
       visited.add(nextKey)
       parent.set(nextKey, key)
+      distance.set(nextKey, (distance.get(key) ?? 0) + 1)
       queue.push([nextRow, nextCol])
     })
   }
 
-  if (!goal) return []
-  const reversed: Array<{ row: number; col: number }> = []
-  let cursor: string | undefined = goal
-  while (cursor) {
-    const [row, col] = cursor.split(':').map(Number)
-    reversed.push({ row: row - 1, col: col - 1 })
-    cursor = parent.get(cursor)
+  return (target) => {
+    const targetRow = target.row + 1
+    const targetCol = target.col + 1
+    const goals: string[] = []
+    directions.forEach(([dr, dc]) => {
+      const row = targetRow + dr
+      const col = targetCol + dc
+      const key = cellKey(row, col)
+      if (row >= 0 && col >= 0 && row < paddedRows && col < paddedCols && visited.has(key)) goals.push(key)
+    })
+    goals.sort((a, b) => (distance.get(a) ?? Infinity) - (distance.get(b) ?? Infinity))
+    if (!goals.length) return []
+
+    const reversed: Array<{ row: number; col: number }> = []
+    let cursor: string | undefined = goals[0]
+    while (cursor) {
+      const [row, col] = cursor.split(':').map(Number)
+      reversed.push({ row: row - 1, col: col - 1 })
+      cursor = parent.get(cursor)
+    }
+    return reversed.reverse()
   }
-  return reversed.reverse()
 }

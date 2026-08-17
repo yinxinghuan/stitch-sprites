@@ -51,6 +51,11 @@ export class GameView {
   }
 
   bind(engine: GameEngine): void {
+    window.addEventListener('pointerup', () => {
+      void engine.audio.unlock().then(() => {
+        if (engine.snapshot.slots.length) engine.audio.spool()
+      })
+    }, { once: true, capture: true })
     this.soundButton.addEventListener('click', async () => {
       await engine.audio.unlock()
       engine.audio.toggle()

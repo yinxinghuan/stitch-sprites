@@ -1,6 +1,6 @@
 import { GameAudio } from './audio'
 import { createCells, createColumns, LEVELS } from './levels'
-import { chooseReachableCell, findReachable, findWalkPath, reachableColors } from './reachability'
+import { chooseReachableCell, createWalkPathfinder, findReachable, reachableColors } from './reachability'
 import type { ActiveSlot, GameSnapshot, LevelDefinition, SpoolState, StitchTask, ThreadColor } from './types'
 
 interface EngineHooks {
@@ -23,6 +23,7 @@ export class GameEngine {
   private slotSequence = 0
   private busy = false
   private generation = 0
+  private arrivalEmitTimer = 0
 
   constructor(private readonly hooks: EngineHooks) {
     const queryLevel = Number(new URLSearchParams(location.search).get('level'))
@@ -59,14 +60,13 @@ export class GameEngine {
 
   async selectColumn(index: number): Promise<void> {
     if (!this.canSelectColumn(index)) return
-    await this.audio.unlock()
     const spool = this.columns[index].shift()
     if (!spool) return
     this.audio.spool()
     this.slots.push({ slotId: ++this.slotSequence, spool, state: 'waiting' })
     if (this.removed === 0) this.messageKey = 'hint.first'
     this.emit()
-    void this.processWork()
+    window.requestAnimationFrame(() => void this.processWork())
   }
 
   restart(): void {
@@ -84,6 +84,8 @@ export class GameEngine {
   }
 
   private loadLevel(index: number): void {
+    if (this.arrivalEmitTimer) window.clearTimeout(this.arrivalEmitTimer)
+    this.arrivalEmitTimer = 0
     this.generation += 1
     this.levelIndex = index
     this.level = LEVELS[index]
@@ -102,6 +104,21 @@ export class GameEngine {
     this.hooks.onChange(this.snapshot)
   }
 
+  private emitArrivalBatched(): void {
+    if (this.arrivalEmitTimer) return
+    this.arrivalEmitTimer = window.setTimeout(() => {
+      this.arrivalEmitTimer = 0
+      this.emit()
+    }, 80)
+  }
+
+  private flushArrivalEmit(): void {
+    if (!this.arrivalEmitTimer) return
+    window.clearTimeout(this.arrivalEmitTimer)
+    this.arrivalEmitTimer = 0
+    this.emit()
+  }
+
   private async processWork(): Promise<void> {
     if (this.busy || this.phase !== 'playing') return
     this.busy = true
@@ -111,6 +128,7 @@ export class GameEngine {
 
     while (this.phase === 'playing' && runGeneration === this.generation) {
       const reachable = findReachable(this.cells)
+      const findWalkPath = createWalkPathfinder(this.cells)
       const reserved = new Set<string>()
       const tasks: StitchTask[] = []
       let introducedWaiting = false
@@ -124,7 +142,7 @@ export class GameEngine {
         for (let workerIndex = 0; workerIndex < workerCount; workerIndex += 1) {
           const target = chooseReachableCell(this.cells, reachable, slot.spool.color, reserved)
           if (!target) break
-          const path = findWalkPath(this.cells, target)
+          const path = findWalkPath(target)
           if (!path.length) break
           foundTarget = true
           reserved.add(`${target.row}:${target.col}`)
@@ -174,9 +192,10 @@ export class GameEngine {
         slot.spool.remaining -= 1
         this.removed += 1
         if (this.removed % this.level.density === 0) this.audio.unstitch()
-        this.emit()
+        this.emitArrivalBatched()
       }))
       if (runGeneration !== this.generation) return
+      this.flushArrivalEmit()
       await delay(settleDelay)
       if (runGeneration !== this.generation) return
 

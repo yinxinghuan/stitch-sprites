@@ -24,7 +24,7 @@ const initial = await remaining()
 if (initial !== 792) throw new Error(`Expected 792 initial stitches, got ${initial}`)
 
 await page.locator('[data-column="0"]').click()
-const checkpoints = [0, 140, 320, 520, 850, 1300]
+const checkpoints = [0, 140, 320, 520, 700, 850, 1050, 1300]
 let elapsed = 0
 const readings = []
 for (const checkpoint of checkpoints) {
