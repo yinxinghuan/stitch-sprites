@@ -245,63 +245,62 @@ export class BoardRenderer {
     const pulse = 0.5 + Math.sin(time / 320) * 0.5
     this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
       if (!cell.color || cell.cleared) return
-      const x = geo.left + colIndex * geo.cellSize
-      const y = geo.top + rowIndex * geo.cellSize
-      const thread = THREAD_COLORS[cell.color]
-      const pad = geo.cellSize * 0.16
+      const centerX = geo.left + (colIndex + 0.5) * geo.cellSize
+      const centerY = geo.top + (rowIndex + 0.5) * geo.cellSize
       const accessible = this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))
-
-      ctx.save()
-      if (accessible) {
-        ctx.shadowColor = `rgba(255,255,255,${0.45 + pulse * 0.35})`
-        ctx.shadowBlur = 8 + pulse * 5
-      } else {
-        ctx.shadowColor = 'rgba(47, 38, 48, .22)'
-        ctx.shadowBlur = 4
-        ctx.shadowOffsetY = 2
-      }
-      ctx.fillStyle = thread.dark
-      this.roundedRect(ctx, x + 2, y + 2, geo.cellSize - 4, geo.cellSize - 4, geo.cellSize * 0.18)
-      ctx.fill()
-      ctx.shadowColor = 'transparent'
-      ctx.lineCap = 'round'
-      ctx.lineWidth = Math.max(5, geo.cellSize * 0.26)
-      ctx.strokeStyle = thread.hex
-      ctx.beginPath()
-      ctx.moveTo(x + pad, y + pad)
-      ctx.lineTo(x + geo.cellSize - pad, y + geo.cellSize - pad)
-      ctx.moveTo(x + geo.cellSize - pad, y + pad)
-      ctx.lineTo(x + pad, y + geo.cellSize - pad)
-      ctx.stroke()
-      ctx.lineWidth = Math.max(1.2, geo.cellSize * 0.055)
-      ctx.strokeStyle = thread.light
-      ctx.beginPath()
-      ctx.moveTo(x + pad + 1, y + pad)
-      ctx.lineTo(x + geo.cellSize - pad, y + geo.cellSize - pad - 1)
-      ctx.stroke()
-      this.drawSymbol(ctx, cell.color, x + geo.cellSize / 2, y + geo.cellSize / 2, geo.cellSize * 0.12)
-      ctx.restore()
+      this.drawParticle(ctx, cell.color, centerX, centerY, geo.cellSize * 0.52, accessible, pulse)
     }))
   }
 
-  private drawSymbol(ctx: CanvasRenderingContext2D, color: ThreadColor, x: number, y: number, size: number): void {
-    const symbol = THREAD_COLORS[color].symbol
+  private drawParticle(
+    ctx: CanvasRenderingContext2D,
+    color: ThreadColor,
+    x: number,
+    y: number,
+    size: number,
+    accessible: boolean,
+    pulse: number,
+  ): void {
+    const thread = THREAD_COLORS[color]
+    const symbol = thread.symbol
     ctx.save()
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'
-    ctx.fillStyle = 'rgba(255,255,255,.9)'
-    ctx.lineWidth = Math.max(1.3, size * 0.32)
-    if (symbol === 'circle') {
-      ctx.beginPath(); ctx.arc(x, y, size * 0.52, 0, Math.PI * 2); ctx.fill()
-    } else if (symbol === 'ring') {
-      ctx.beginPath(); ctx.arc(x, y, size * 0.58, 0, Math.PI * 2); ctx.stroke()
-    } else if (symbol === 'diamond') {
-      ctx.beginPath(); ctx.moveTo(x, y - size * 0.7); ctx.lineTo(x + size * 0.7, y); ctx.lineTo(x, y + size * 0.7); ctx.lineTo(x - size * 0.7, y); ctx.closePath(); ctx.fill()
-    } else if (symbol === 'triangle') {
-      ctx.beginPath(); ctx.moveTo(x, y - size * 0.72); ctx.lineTo(x + size * 0.72, y + size * 0.55); ctx.lineTo(x - size * 0.72, y + size * 0.55); ctx.closePath(); ctx.fill()
-    } else if (symbol === 'bar') {
-      ctx.beginPath(); ctx.moveTo(x - size * 0.7, y); ctx.lineTo(x + size * 0.7, y); ctx.stroke()
+    ctx.fillStyle = thread.hex
+    ctx.strokeStyle = thread.dark
+    ctx.lineWidth = Math.max(1, size * 0.12)
+    ctx.lineJoin = 'round'
+    if (accessible) {
+      ctx.shadowColor = `rgba(255,255,255,${0.55 + pulse * 0.35})`
+      ctx.shadowBlur = 4 + pulse * 4
     } else {
-      ctx.beginPath(); ctx.moveTo(x - size * 0.55, y - size * 0.55); ctx.lineTo(x + size * 0.55, y + size * 0.55); ctx.moveTo(x + size * 0.55, y - size * 0.55); ctx.lineTo(x - size * 0.55, y + size * 0.55); ctx.stroke()
+      ctx.shadowColor = 'rgba(47,38,48,.22)'
+      ctx.shadowBlur = 2
+      ctx.shadowOffsetY = 1
+    }
+    if (symbol === 'circle') {
+      ctx.beginPath(); ctx.arc(x, y, size * 0.48, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    } else if (symbol === 'ring') {
+      ctx.beginPath(); ctx.arc(x, y, size * 0.48, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+      ctx.shadowColor = 'transparent'
+      ctx.fillStyle = '#fff9ec'
+      ctx.beginPath(); ctx.arc(x, y, size * 0.17, 0, Math.PI * 2); ctx.fill()
+    } else if (symbol === 'diamond') {
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.52); ctx.lineTo(x + size * 0.52, y); ctx.lineTo(x, y + size * 0.52); ctx.lineTo(x - size * 0.52, y); ctx.closePath(); ctx.fill(); ctx.stroke()
+    } else if (symbol === 'triangle') {
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.52); ctx.lineTo(x + size * 0.52, y + size * 0.42); ctx.lineTo(x - size * 0.52, y + size * 0.42); ctx.closePath(); ctx.fill(); ctx.stroke()
+    } else if (symbol === 'bar') {
+      this.roundedRect(ctx, x - size * 0.55, y - size * 0.3, size * 1.1, size * 0.6, size * 0.3)
+      ctx.fill(); ctx.stroke()
+    } else {
+      const sides = 6
+      ctx.beginPath()
+      for (let index = 0; index < sides; index += 1) {
+        const angle = -Math.PI / 2 + index * Math.PI * 2 / sides
+        const px = x + Math.cos(angle) * size * 0.5
+        const py = y + Math.sin(angle) * size * 0.5
+        if (index === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke()
     }
     ctx.restore()
   }

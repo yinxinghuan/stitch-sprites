@@ -44,6 +44,14 @@
 - **修复**：≤340px 时关卡标题降为 18px，状态胶囊最小宽度由 64px 收至 60px。
 - **复验**：`density-v2-final-platform-layout-level2-initial-320x568.png` 完整显示关卡名，HUD 仍可读。
 
+## Micro-particle v3 review
+
+- **决定**：颗粒占单格比例由接近满格降至约 52%；移除满格底板、粗十字针脚和白色中心符号。规则、关卡和节拍不变。
+- **第一轮证据**：`micro-v3-first-pass-platform-layout-level1-initial-390x844.png` 与 `micro-v3-first-pass-platform-layout-level2-initial-320x568.png`。
+- **可读性**：14×14 在 320px 宽度下仍能区分六种颜色与轮廓，外层包裹关系和拆除空路更清楚。
+- **视觉边界**：当前是机制灰盒，不评价最终线材、精灵素材或整体美术完成度；这些进入下一阶段。
+- **剩余风险**：需要真人确认更小颗粒是否比上一版更易观察，而不是只显得更稀疏。
+
 ## Findings and fixes
 
 ### P1 — 重开按钮与第一列线轴相撞（已修）
