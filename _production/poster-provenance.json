@@ -1,0 +1,10 @@
+{
+  "endpoint": "https://chat.aiwaves.tech/aigram/api/gen-image",
+  "origin": "https://aigram.app",
+  "generated_at": "2026-08-17T19:30:46+0800",
+  "elapsed_seconds": 13.8,
+  "returned_url": "https://cdn.aiwaves.tech/prodsv/telegram/avatar/0/1786966237101587.png",
+  "prompt": "Square 1024x1024 premium mobile puzzle game key art, modern whimsical miniature craft world.\nAt the TOP within the upper 20 percent, clearly typeset the exact four Chinese characters\n“拆线精灵” in large bold dark-charcoal contemporary sans-serif lettering, perfectly readable,\nno other words anywhere.\n\nHero scene: a huge warm wooden embroidery hoop viewed from a gentle three-quarter overhead angle.\nInside it is a vibrant cross-stitch mosaic made from thick tactile coral, mustard yellow, lake blue,\nlavender and charcoal thread. The lower outer layer has been removed, leaving an unmistakable clean\ncream fabric path leading inward. Five tiny original thread sprites work together: round soft yarn\nbodies, expressive eyes, two loose-thread antennae, tiny legs, each holding a silver unpicking needle.\nOne sprite triumphantly pulls a long colored X-stitch out of the fabric while the thread whips back\ninto a matching reel; two sprites run along the newly opened path; one waits beside a wooden reel rack.\nMake the action readable at 160x160 thumbnail size.\n\nTactile fibers, macro photography material detail, painterly 3D illustration, warm window light,\nsoft contact shadows, playful energy, premium casual-game polish, strong silhouettes, authored\ncharacter design, contemporary global visual language. Not Chinese traditional style: no lanterns,\nno palace, no scrolls, no red-gold theme, no cloud motifs, no calligraphy. Not a game screenshot,\nno HUD, no buttons, no phone frame, no watermark, no logo besides the exact title. Keep the bottom\n20 percent quiet with only softly lit tabletop so platform controls cannot cover the characters.",
+  "output": "public/poster.png",
+  "source": "Aigram platform transit txt2img; not a screenshot, SVG, Canvas, ComfyUI, or local workflow"
+}
