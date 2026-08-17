@@ -130,6 +130,7 @@ button {
 }
 
 .ss-icon-button {
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -637,6 +638,12 @@ button {
   .ss-spool { min-height: 70px; }
   .ss-spool__card { height: 68px; }
   .ss-spool-back { height: 58px; bottom: calc(5px + var(--depth) * 13px); }
+}
+
+@media (max-width: 340px) {
+  .ss-level { font-size: 18px; }
+  .ss-header__actions { gap: 3px; }
+  .ss-remaining { min-width: 60px; padding-inline: 5px; font-size: 13px; }
 }
 
 @media (min-width: 521px) {
