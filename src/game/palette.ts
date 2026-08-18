@@ -9,6 +9,30 @@ export const THREAD_COLORS: Record<ThreadColor, { hex: string; dark: string; lig
   ink: { hex: '#3b3a47', dark: '#1f1f29', light: '#898795', symbol: 'cross' },
 }
 
+export type ThreadStyle = (typeof THREAD_COLORS)[ThreadColor]
+
+function mix(hex: string, target: string, amount: number): string {
+  const parse = (value: string): number[] => [1, 3, 5].map((index) => Number.parseInt(value.slice(index, index + 2), 16))
+  const source = parse(hex)
+  const destination = parse(target)
+  return `#${source.map((channel, index) => Math.round(channel + (destination[index] - channel) * amount).toString(16).padStart(2, '0')).join('')}`
+}
+
+export function resolveThreadStyle(
+  color: ThreadColor,
+  palette?: Partial<Record<ThreadColor, string>>,
+): ThreadStyle {
+  const base = THREAD_COLORS[color]
+  const hex = palette?.[color] ?? base.hex
+  if (hex.toLowerCase() === base.hex.toLowerCase()) return base
+  return {
+    hex,
+    dark: mix(hex, '#17151c', 0.42),
+    light: mix(hex, '#fff7e8', 0.48),
+    symbol: base.symbol,
+  }
+}
+
 export const CODE_TO_COLOR: Record<string, ThreadColor> = {
   Y: 'sun',
   R: 'coral',
@@ -21,4 +45,3 @@ export const CODE_TO_COLOR: Record<string, ThreadColor> = {
   D: 'lake',
   E: 'ink',
 }
-

@@ -1,100 +1,57 @@
 import { CODE_TO_COLOR } from './palette'
-import type { Cell, LevelDefinition, SpoolState, ThreadColor } from './types'
+import { GENERATED_PATTERNS } from './generated-patterns'
+import { findReachable, reachableColors } from './reachability'
+import type { Cell, LevelDefinition, SpoolDefinition, SpoolState, ThreadColor } from './types'
 
-export const LEVELS: LevelDefinition[] = [
-  {
-    id: 1,
-    titleKey: 'level.flower',
-    reveal: 'sprout',
-    density: 3,
-    tutorial: true,
-    rows: [
-      '..YYYYYY..',
-      '.YYYYYYYY.',
-      'YYRRRRRRYY',
-      'YRRRRRRRRY',
-      'YRRBBBRRRY',
-      'YRRBGBRRRY',
-      'YRRBBBRRRY',
-      'YYRRRRRRYY',
-      '.YYYYYYYY.',
-      '..YYYYYY..',
-    ],
-    columns: [
-      [
-        { id: 'l1-y-12a', color: 'sun', capacity: 12 },
-        { id: 'l1-r-12a', color: 'coral', capacity: 12 },
-        { id: 'l1-b-4a', color: 'lake', capacity: 4 },
-      ],
-      [
-        { id: 'l1-y-12b', color: 'sun', capacity: 12 },
-        { id: 'l1-r-12b', color: 'coral', capacity: 12 },
-        { id: 'l1-b-4b', color: 'lake', capacity: 4 },
-      ],
-      [
-        { id: 'l1-y-10a', color: 'sun', capacity: 10 },
-        { id: 'l1-r-11', color: 'coral', capacity: 11 },
-        { id: 'l1-g-1', color: 'leaf', capacity: 1 },
-      ],
-      [
-        { id: 'l1-y-10b', color: 'sun', capacity: 10 },
-      ],
-    ],
-  },
-  {
-    id: 2,
-    titleKey: 'level.moth',
-    reveal: 'moth',
-    density: 3,
-    tutorial: false,
-    rows: [
-      '..PPPPPPPPPP..',
-      '.PPRRRRRRRRPP.',
-      'PPRRYYYYYYRRPP',
-      'PRRYYBBBBYYRRP',
-      'PRYYBBKKBBYYRP',
-      'PRYBBKGGKBBYRP',
-      'PRYBKGGGGKBYRP',
-      'PRYBKGGGGKBYRP',
-      'PRYBBKGGKBBYRP',
-      'PRYYBBKKBBYYRP',
-      'PRRYYBBBBYYRRP',
-      'PPRRYYYYYYRRPP',
-      '.PPRRRRRRRRPP.',
-      '..PPPPPPPPPP..',
-    ],
-    columns: [
-      [
-        { id: 'l2-p-12', color: 'violet', capacity: 12 },
-        { id: 'l2-r-12', color: 'coral', capacity: 12 },
-        { id: 'l2-p-10a', color: 'violet', capacity: 10 },
-        { id: 'l2-b-10a', color: 'lake', capacity: 10 },
-        { id: 'l2-k-6a', color: 'ink', capacity: 6 },
-      ],
-      [
-        { id: 'l2-y-12a', color: 'sun', capacity: 12 },
-        { id: 'l2-b-10b', color: 'lake', capacity: 10 },
-        { id: 'l2-p-10b', color: 'violet', capacity: 10 },
-        { id: 'l2-r-8a', color: 'coral', capacity: 8 },
-        { id: 'l2-g-6b', color: 'leaf', capacity: 6 },
-      ],
-      [
-        { id: 'l2-b-8', color: 'lake', capacity: 8 },
-        { id: 'l2-k-6b', color: 'ink', capacity: 6 },
-        { id: 'l2-p-10c', color: 'violet', capacity: 10 },
-        { id: 'l2-r-8b', color: 'coral', capacity: 8 },
-        { id: 'l2-y-12b', color: 'sun', capacity: 12 },
-      ],
-      [
-        { id: 'l2-g-6a', color: 'leaf', capacity: 6 },
-        { id: 'l2-r-8c', color: 'coral', capacity: 8 },
-        { id: 'l2-p-10d', color: 'violet', capacity: 10 },
-        { id: 'l2-r-8d', color: 'coral', capacity: 8 },
-        { id: 'l2-y-12c', color: 'sun', capacity: 12 },
-      ],
-    ],
-  },
+const LEVEL_KEYS = [
+  'watermelon', 'ladybug', 'turtle', 'whale', 'butterfly', 'teapot', 'moonCat', 'cottage',
+  'yarn', 'mitten', 'sweater', 'clock', 'basket', 'musicBox', 'craftRoom', 'potion', 'slime',
+  'spellbook', 'mushroomHome', 'moth', 'starCat', 'flowerFox', 'spiritTree', 'umbrella',
+  'suitcase', 'bell', 'tram', 'lighthouse', 'nightTrain', 'observatory', 'city', 'alteruCoral',
+  'alteruSun', 'alteruNight', 'alteruBloom',
 ]
+
+const LEVEL_COPY: Record<string, { titleKey: string; completeKey: string }> = Object.fromEntries(
+  LEVEL_KEYS.map((key) => [key, { titleKey: `level.${key}`, completeKey: `complete.${key}` }]),
+)
+
+function defineLevel(index: number): LevelDefinition {
+  const generated = GENERATED_PATTERNS[index]
+  if (!generated) throw new Error(`Missing generated pattern ${index + 1}`)
+  const id = index + 1
+  const copy = LEVEL_COPY[generated.key]
+  if (!copy) throw new Error(`Missing copy metadata for ${generated.key}`)
+  const width = generated.rows[0]?.length ?? 0
+  if (!width || generated.rows.some((row) => row.length !== width)) {
+    throw new Error(`Level ${id}: all pattern rows must have the same width`)
+  }
+  const columns: SpoolDefinition[][] = generated.columns.map((column, columnIndex) => column.map(([code, capacity], spoolIndex) => {
+    const color = CODE_TO_COLOR[code]
+    if (!color) throw new Error(`Level ${id}: unknown generated spool color ${code}`)
+    return {
+      id: `l${id}-${color}-${columnIndex + 1}-${String(spoolIndex + 1).padStart(2, '0')}`,
+      color,
+      capacity,
+    }
+  }))
+  return {
+    id,
+    ...copy,
+    reveal: generated.key,
+    density: 1,
+    rows: generated.rows,
+    displayPalette: Object.fromEntries(
+      Object.entries(generated.palette)
+        .map(([code, hex]) => [CODE_TO_COLOR[code], hex])
+        .filter(([color]) => Boolean(color)),
+    ) as Partial<Record<ThreadColor, string>>,
+    tutorial: id <= 2,
+    columns,
+    solution: generated.solution,
+  }
+}
+
+export const LEVELS: LevelDefinition[] = GENERATED_PATTERNS.map((_, index) => defineLevel(index))
 
 export function createCells(level: LevelDefinition): Cell[][] {
   return level.rows.flatMap((row) => Array.from({ length: level.density }, () => (
@@ -123,7 +80,20 @@ function countCells(level: LevelDefinition): Map<ThreadColor, number> {
 }
 
 export function validateLevels(): void {
-  LEVELS.forEach((level) => {
+  if (LEVELS.length !== 35) throw new Error(`Expected 35 levels, found ${LEVELS.length}`)
+  let previousColorCount = 0
+  LEVELS.forEach((level, index) => {
+    const generated = GENERATED_PATTERNS[index]
+    if (generated.colorCount < previousColorCount) {
+      throw new Error(`Level ${level.id}: color count order regressed`)
+    }
+    previousColorCount = generated.colorCount
+    const initialCells = createCells(level)
+    const entryColors = reachableColors(initialCells, findReachable(initialCells))
+    if (!entryColors.size) throw new Error(`Level ${level.id}: expected a reachable outer color`)
+    if (level.id === 1 && entryColors.size !== 1) {
+      throw new Error(`Level 1: expected one tutorial outer color, found ${[...entryColors].join(', ')}`)
+    }
     const cells = countCells(level)
     const spools = new Map<ThreadColor, number>()
     createColumns(level).flat().forEach((spool) => {

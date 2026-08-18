@@ -1,8 +1,9 @@
-import { THREAD_COLORS } from '../game/palette'
+import { CODE_TO_COLOR, resolveThreadStyle } from '../game/palette'
+import { LEVELS } from '../game/levels'
 import type { GameEngine } from '../game/engine'
-import type { GameSnapshot, SpoolState, ThreadColor } from '../game/types'
+import type { GameSnapshot, LevelDefinition, SpoolState, ThreadColor } from '../game/types'
 import { t } from '../i18n'
-import { arrowIcon, restartIcon, revealIcon, soundIcon } from './icons'
+import { arrowIcon, closeIcon, galleryIcon, restartIcon, soundIcon } from './icons'
 
 export class GameView {
   readonly canvas: HTMLCanvasElement
@@ -14,14 +15,16 @@ export class GameView {
   private readonly overlay: HTMLElement
   private readonly soundButton: HTMLButtonElement
   private readonly restartButton: HTMLButtonElement
+  private readonly headingButton: HTMLButtonElement
+  private galleryOpen = false
   constructor(root: HTMLElement) {
     root.innerHTML = `
       <div class="ss-app">
         <header class="ss-header">
-          <div class="ss-heading">
+          <button class="ss-heading" type="button">
             <span class="ss-kicker">${t('game.title')}</span>
-            <h1 class="ss-level"></h1>
-          </div>
+            <span class="ss-heading__line"><span class="ss-level"></span>${galleryIcon}</span>
+          </button>
           <div class="ss-header__actions">
             <span class="ss-remaining"></span>
             <button class="ss-restart ss-icon-button" type="button">${restartIcon}</button>
@@ -48,6 +51,7 @@ export class GameView {
     this.overlay = root.querySelector('.ss-overlay')!
     this.soundButton = root.querySelector('.ss-sound')!
     this.restartButton = root.querySelector('.ss-restart')!
+    this.headingButton = root.querySelector('.ss-heading')!
   }
 
   bind(engine: GameEngine): void {
@@ -62,6 +66,10 @@ export class GameView {
       this.renderSound(engine)
     })
     this.restartButton.addEventListener('click', () => engine.restart())
+    this.headingButton.addEventListener('click', () => {
+      this.galleryOpen = true
+      this.renderOverlay(engine.snapshot, engine)
+    })
     window.addEventListener('keydown', (event) => {
       if (event.key.toLowerCase() === 'r') engine.restart()
       const index = Number(event.key) - 1
@@ -79,6 +87,7 @@ export class GameView {
     this.renderTray(snapshot, engine)
     this.renderOverlay(snapshot, engine)
     this.restartButton.setAttribute('aria-label', t('action.restart'))
+    this.headingButton.setAttribute('aria-label', t('action.gallery'))
     this.renderSound(engine)
   }
 
@@ -97,7 +106,7 @@ export class GameView {
           <span class="ss-slot__notch ss-slot__notch--bottom"></span>
         </div>
       `
-      const thread = THREAD_COLORS[slot.spool.color]
+      const thread = resolveThreadStyle(slot.spool.color, snapshot.level.displayPalette)
       const stateText = t(slot.state === 'working' ? 'status.working' : 'status.waiting')
       return `
         <div class="ss-slot ss-slot--${slot.state}" style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${stateText} ${slot.spool.remaining}">
@@ -113,8 +122,8 @@ export class GameView {
     this.slots.innerHTML = items.join('')
   }
 
-  private spoolMarkup(spool: SpoolState, columnIndex: number, enabled: boolean): string {
-    const thread = THREAD_COLORS[spool.color]
+  private spoolMarkup(spool: SpoolState, columnIndex: number, enabled: boolean, level: LevelDefinition): string {
+    const thread = resolveThreadStyle(spool.color, level.displayPalette)
     const colorName = t(`color.${spool.color}`)
     const label = t('tray.spool', { color: colorName, n: spool.remaining })
     return `
@@ -135,13 +144,13 @@ export class GameView {
       const top = column[0]
       const enabled = engine.canSelectColumn(index)
       const backLayers = column.slice(1, 3).map((spool, depth) => {
-        const thread = THREAD_COLORS[spool.color]
+        const thread = resolveThreadStyle(spool.color, snapshot.level.displayPalette)
         return `<span class="ss-spool-back" style="--depth:${depth + 1};--thread:${thread.hex}"></span>`
       }).reverse().join('')
       return `
         <div class="ss-column" aria-label="${t('tray.column', { n: index + 1 })}">
           ${backLayers}
-          ${top ? this.spoolMarkup(top, index, enabled) : '<span class="ss-column__empty"></span>'}
+          ${top ? this.spoolMarkup(top, index, enabled, snapshot.level) : '<span class="ss-column__empty"></span>'}
         </div>
       `
     }).join('')
@@ -155,6 +164,10 @@ export class GameView {
   }
 
   private renderOverlay(snapshot: GameSnapshot, engine: GameEngine): void {
+    if (this.galleryOpen) {
+      this.renderGallery(engine)
+      return
+    }
     if (snapshot.phase === 'playing') {
       this.overlay.hidden = true
       this.overlay.innerHTML = ''
@@ -162,19 +175,25 @@ export class GameView {
     }
     this.overlay.hidden = false
     if (snapshot.phase === 'complete') {
-      const revealKey = snapshot.level.reveal === 'sprout' ? 'complete.flower' : 'complete.moth'
       this.overlay.innerHTML = `
         <div class="ss-result ss-result--complete" role="dialog" aria-modal="true">
-          <span class="ss-result__badge ss-result__badge--complete" aria-hidden="true">${revealIcon(snapshot.level.reveal)}</span>
+          <span class="ss-result__badge ss-result__badge--complete" aria-hidden="true"><canvas class="ss-pattern-thumb ss-pattern-thumb--result" data-pattern-level="${snapshot.level.id}"></canvas></span>
           <div class="ss-result__copy">
             <span class="ss-result__eyebrow">${t('complete.title')}</span>
             <p>${t('complete.reveal')}</p>
-            <h2>${t(revealKey)}</h2>
+            <h2>${t(snapshot.level.completeKey)}</h2>
           </div>
-          <button class="ss-primary" type="button">${snapshot.level.id < 2 ? t('action.next') : t('action.again')} ${arrowIcon}</button>
+          <button class="ss-primary" type="button">${snapshot.level.id < LEVELS.length ? t('action.next') : t('action.gallery')} ${snapshot.level.id < LEVELS.length ? arrowIcon : galleryIcon}</button>
         </div>
       `
-      this.overlay.querySelector('button')?.addEventListener('click', () => snapshot.level.id < 2 ? engine.next() : engine.restart(), { once: true })
+      this.paintPatternCanvases()
+      this.overlay.querySelector('button')?.addEventListener('click', () => {
+        if (snapshot.level.id < LEVELS.length) engine.next()
+        else {
+          this.galleryOpen = true
+          this.renderGallery(engine)
+        }
+      }, { once: true })
     } else {
       const colors = engine.currentNeededColors().map((color: ThreadColor) => t(`color.${color}`)).join('、')
       this.overlay.innerHTML = `
@@ -190,5 +209,117 @@ export class GameView {
       `
       this.overlay.querySelector('button')?.addEventListener('click', () => engine.restart(), { once: true })
     }
+  }
+
+  private renderGallery(engine: GameEngine): void {
+    const colorCount = (level: LevelDefinition): number => new Set(level.rows.join('').replaceAll('.', '')).size
+    const chapters = [2, 3, 4, 5, 6].map((count) => ({
+      key: `chapter.colors${count}`,
+      levels: LEVELS.filter((level) => colorCount(level) === count),
+    })).filter((chapter) => chapter.levels.length)
+    this.overlay.hidden = false
+    this.overlay.innerHTML = `
+      <div class="ss-gallery" role="dialog" aria-modal="true" aria-label="${t('gallery.title')}">
+        <header class="ss-gallery__header">
+          <div><span>${t('game.title')}</span><h2>${t('gallery.title')}</h2></div>
+          <button class="ss-gallery__close ss-icon-button" type="button" aria-label="${t('action.close')}">${closeIcon}</button>
+        </header>
+        <div class="ss-gallery__scroll">
+          ${chapters.map((chapter) => `
+            <section class="ss-gallery__chapter">
+              <h3>${t(chapter.key)}</h3>
+              <div class="ss-gallery__grid">
+                ${chapter.levels.map((level) => {
+                  const unlocked = level.id <= engine.unlockedLevel
+                  const colors = colorCount(level)
+                  return `
+                    <button class="ss-gallery-card ${unlocked ? '' : 'ss-gallery-card--locked'}" type="button" data-level="${level.id}" ${unlocked ? '' : 'disabled'}>
+                      <span class="ss-gallery-card__icon" aria-hidden="true"><canvas class="ss-pattern-thumb" data-pattern-level="${level.id}"></canvas></span>
+                      <span class="ss-gallery-card__copy"><strong>${level.id} · ${t(level.titleKey)}</strong><small>${unlocked ? t('gallery.colors', { n: colors }) : t('gallery.locked')}</small></span>
+                    </button>
+                  `
+                }).join('')}
+              </div>
+            </section>
+          `).join('')}
+        </div>
+      </div>
+    `
+    this.paintPatternCanvases()
+    this.overlay.querySelector('.ss-gallery__close')?.addEventListener('click', () => {
+      this.galleryOpen = false
+      this.renderOverlay(engine.snapshot, engine)
+    }, { once: true })
+    this.overlay.querySelectorAll<HTMLButtonElement>('.ss-gallery-card:not(:disabled)').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.galleryOpen = false
+        engine.openLevel(Number(button.dataset.level))
+      }, { once: true })
+    })
+  }
+
+  private paintPatternCanvases(): void {
+    this.overlay.querySelectorAll<HTMLCanvasElement>('[data-pattern-level]').forEach((canvas) => {
+      const level = LEVELS.find((candidate) => candidate.id === Number(canvas.dataset.patternLevel))
+      if (level) this.paintPattern(canvas, level)
+    })
+  }
+
+  private paintPattern(canvas: HTMLCanvasElement, level: LevelDefinition): void {
+    const size = canvas.classList.contains('ss-pattern-thumb--result') ? 128 : 92
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, size, size)
+    const occupied: Array<{ row: number; col: number }> = []
+    level.rows.forEach((row, rowIndex) => [...row].forEach((code, colIndex) => {
+      if (code !== '.') occupied.push({ row: rowIndex, col: colIndex })
+    }))
+    if (!occupied.length) return
+    const minRow = Math.min(...occupied.map((cell) => cell.row))
+    const maxRow = Math.max(...occupied.map((cell) => cell.row))
+    const minCol = Math.min(...occupied.map((cell) => cell.col))
+    const maxCol = Math.max(...occupied.map((cell) => cell.col))
+    const patternRows = maxRow - minRow + 1
+    const patternCols = maxCol - minCol + 1
+    const padding = size * 0.08
+    const cell = Math.min((size - padding * 2) / patternCols, (size - padding * 2) / patternRows)
+    const left = (size - patternCols * cell) / 2
+    const top = (size - patternRows * cell) / 2
+    const texture = new Image()
+    texture.decoding = 'async'
+    texture.onload = () => {
+      ctx.clearRect(0, 0, size, size)
+      ctx.fillStyle = '#fbf3e2'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(texture, left, top, patternCols * cell, patternRows * cell)
+    }
+    texture.src = new URL(`./patterns/${level.reveal}.png`, document.baseURI).href
+    ctx.lineCap = 'round'
+    level.rows.forEach((row, rowIndex) => [...row].forEach((code, colIndex) => {
+      if (code === '.') return
+      const color = CODE_TO_COLOR[code]
+      if (!color) return
+      const thread = resolveThreadStyle(color, level.displayPalette)
+      const x = left + (colIndex - minCol) * cell
+      const y = top + (rowIndex - minRow) * cell
+      ctx.strokeStyle = thread.dark
+      ctx.lineWidth = Math.max(1, cell * 0.42)
+      ctx.beginPath()
+      ctx.moveTo(x + cell * 0.18, y + cell * 0.18)
+      ctx.lineTo(x + cell * 0.82, y + cell * 0.82)
+      ctx.moveTo(x + cell * 0.82, y + cell * 0.18)
+      ctx.lineTo(x + cell * 0.18, y + cell * 0.82)
+      ctx.stroke()
+      ctx.strokeStyle = thread.hex
+      ctx.lineWidth = Math.max(0.8, cell * 0.25)
+      ctx.beginPath()
+      ctx.moveTo(x + cell * 0.18, y + cell * 0.18)
+      ctx.lineTo(x + cell * 0.82, y + cell * 0.82)
+      ctx.moveTo(x + cell * 0.82, y + cell * 0.18)
+      ctx.lineTo(x + cell * 0.18, y + cell * 0.82)
+      ctx.stroke()
+    }))
   }
 }

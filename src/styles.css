@@ -43,6 +43,7 @@ button {
   margin: 0 auto;
   padding: max(12px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto var(--board-size) 82px minmax(126px, 1fr);
   gap: 6px;
   overflow: hidden;
@@ -81,6 +82,7 @@ button {
 }
 
 .ss-header {
+  min-width: 0;
   min-height: 50px;
   display: flex;
   align-items: center;
@@ -89,7 +91,33 @@ button {
 }
 
 .ss-heading {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  display: block;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ss-heading__line {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ss-heading__line > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: #8a7c70;
+  stroke-width: 1.8;
 }
 
 .ss-kicker {
@@ -102,7 +130,8 @@ button {
 }
 
 .ss-level {
-  margin: 0;
+  min-width: 0;
+  display: block;
   overflow: hidden;
   color: #2a2930;
   font-size: clamp(20px, 5.8vw, 27px);
@@ -112,6 +141,7 @@ button {
 }
 
 .ss-header__actions {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -151,6 +181,8 @@ button {
 }
 
 .ss-icon-button:focus-visible,
+.ss-heading:focus-visible,
+.ss-gallery-card:focus-visible,
 .ss-primary:focus-visible,
 .ss-spool:focus-visible {
   outline: 3px solid #4e8bcb;
@@ -221,6 +253,7 @@ button {
 
 .ss-rack {
   position: relative;
+  min-width: 0;
   align-self: center;
   padding: 6px 7px 9px;
   border-radius: 20px;
@@ -330,6 +363,7 @@ button {
 
 .ss-tray {
   align-self: start;
+  min-width: 0;
   width: 100%;
   min-height: 126px;
   padding: clamp(12px, 2.2dvh, 18px) 8px 0;
@@ -519,6 +553,132 @@ button {
   min-width: 0;
 }
 
+.ss-gallery {
+  width: min(100%, 390px);
+  max-height: calc(100dvh - 44px);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 24px;
+  background:
+    repeating-linear-gradient(0deg, rgba(132,105,77,.035) 0 1px, transparent 1px 5px),
+    #fff9ec;
+  box-shadow: 0 16px 42px rgba(60,43,39,.28), inset 0 1px 0 white;
+}
+
+.ss-gallery__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ss-gallery__header span {
+  color: #8a6a4f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.ss-gallery__header h2 {
+  margin: 2px 0 0;
+  font-size: 26px;
+}
+
+.ss-gallery__scroll {
+  min-height: 0;
+  padding: 2px 2px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ss-gallery__chapter + .ss-gallery__chapter {
+  margin-top: 18px;
+}
+
+.ss-gallery__chapter h3 {
+  margin: 0 0 8px 2px;
+  color: #756c70;
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+
+.ss-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ss-gallery-card {
+  min-width: 0;
+  min-height: 82px;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(111,82,62,.16);
+  border-radius: 17px;
+  background: rgba(239,226,207,.72);
+  color: #2a2930;
+  text-align: left;
+  box-shadow: 0 3px 0 rgba(107,78,58,.12);
+  cursor: pointer;
+}
+
+.ss-gallery-card:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(107,78,58,.12);
+}
+
+.ss-gallery-card--locked {
+  filter: grayscale(.8);
+  opacity: .48;
+  cursor: default;
+}
+
+.ss-gallery-card__icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255,249,236,.9);
+  color: #52785e;
+}
+
+.ss-pattern-thumb {
+  width: 42px;
+  height: 42px;
+  display: block;
+  image-rendering: auto;
+}
+
+.ss-gallery-card__copy {
+  min-width: 0;
+}
+
+.ss-gallery-card strong,
+.ss-gallery-card small {
+  display: block;
+}
+
+.ss-gallery-card strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.ss-gallery-card small {
+  margin-top: 4px;
+  color: #756c70;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
 .ss-result__eyebrow {
   display: block;
   margin-bottom: 4px;
@@ -568,15 +728,9 @@ button {
   background: #f1d2d0;
 }
 
-.ss-result__badge svg {
-  width: 56px;
-  height: 56px;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.ss-pattern-thumb--result {
+  width: 62px;
+  height: 62px;
 }
 
 .ss-reveal-icon__leaf,
@@ -677,7 +831,7 @@ button {
   .ss-spool-back { bottom: calc(5px + var(--depth) * 13px); }
   .ss-result { padding: 16px; grid-template-columns: 62px minmax(0, 1fr); gap: 5px 12px; }
   .ss-result__badge { width: 58px; height: 58px; }
-  .ss-result__badge svg { width: 46px; height: 46px; }
+  .ss-pattern-thumb--result { width: 52px; height: 52px; }
 }
 
 @media (max-width: 340px) {

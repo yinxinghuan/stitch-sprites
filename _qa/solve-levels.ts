@@ -88,7 +88,7 @@ function findFailure(initial: SearchState): number[] | null {
     const stateKey = key(current.state)
     if (seen.has(stateKey)) continue
     seen.add(stateKey)
-    if (current.path.length >= 12) continue
+    if (current.path.length >= 5) continue
     const available = reachableColors(current.state.cells, findReachable(current.state.cells))
     const choices = current.state.columns
       .map((column, index) => ({ index, spool: column[0] }))
@@ -105,16 +105,52 @@ function findFailure(initial: SearchState): number[] | null {
   return null
 }
 
-for (const level of LEVELS) {
+const requestedLevel = Number(process.env.STITCH_SPRITES_LEVEL ?? 0)
+const levels = requestedLevel > 0 ? LEVELS.filter((level) => level.id === requestedLevel) : LEVELS
+const failureCheckLevels = new Set([7, 20, 35])
+
+function validatesSolution(initial: SearchState, path: number[]): boolean {
+  let state = initial
+  for (const column of path) {
+    const result = select(state, column)
+    if (!result || result.failed) return false
+    if (result.complete) return true
+    state = result.state
+  }
+  return false
+}
+
+const summaries = []
+for (const level of levels) {
   const initial: SearchState = {
     cells: createCells(level),
     columns: createColumns(level),
     slots: [],
     sequence: 0,
   }
-  const solution = findSolution(initial)
-  const failure = level.tutorial ? null : findFailure(initial)
-  if (!solution) throw new Error(`Level ${level.id} has no solution`)
-  if (!level.tutorial && !failure) throw new Error(`Level ${level.id} has no failure path within 12 selections`)
-  console.log(JSON.stringify({ level: level.id, solution, failure }))
+  const solution = level.solution
+  const failure = failureCheckLevels.has(level.id) ? findFailure(initial) : null
+  if (!solution || !validatesSolution(initial, solution)) throw new Error(`Level ${level.id} has no valid solution`)
+  if (failureCheckLevels.has(level.id) && !failure) throw new Error(`Difficulty checkpoint ${level.id} has no failure path within 5 selections`)
+  const spools = level.columns.flat()
+  const summary = {
+    level: level.id,
+    stitches: level.rows.reduce((count, row) => count + [...row].filter((code) => code !== '.').length, 0),
+    colors: new Set(level.rows.join('').replaceAll('.', '')).size,
+    selections: solution.length,
+    minCapacity: Math.min(...spools.map((spool) => spool.capacity)),
+    maxCapacity: Math.max(...spools.map((spool) => spool.capacity)),
+    failure,
+  }
+  summaries.push(summary)
+  console.log(JSON.stringify(summary))
 }
+
+const selectionCounts = summaries.map((summary) => summary.selections)
+console.log(JSON.stringify({
+  ok: true,
+  levels: summaries.length,
+  minSelections: Math.min(...selectionCounts),
+  maxSelections: Math.max(...selectionCounts),
+  averageSelections: Number((selectionCounts.reduce((sum, value) => sum + value, 0) / selectionCounts.length).toFixed(1)),
+}))

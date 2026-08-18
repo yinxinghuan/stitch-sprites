@@ -1,4 +1,4 @@
-import { THREAD_COLORS } from './palette'
+import { resolveThreadStyle } from './palette'
 import { cellKey } from './reachability'
 import type { GameSnapshot, StitchTask, ThreadColor } from './types'
 
@@ -47,6 +47,7 @@ export class BoardRenderer {
   private destroyed = false
   private resizeObserver: ResizeObserver
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  private readonly patternTextures = new Map<string, HTMLImageElement>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d')
@@ -63,8 +64,28 @@ export class BoardRenderer {
     this.resize()
   }
 
+  private thread(color: ThreadColor) {
+    return resolveThreadStyle(color, this.snapshot?.level.displayPalette)
+  }
+
+  private patternTexture(key: string): HTMLImageElement | null {
+    const cached = this.patternTextures.get(key)
+    if (cached) return cached.complete && cached.naturalWidth ? cached : null
+    const image = new Image()
+    image.decoding = 'async'
+    image.onload = () => {
+      this.fullStaticRedraw = true
+      this.staticDirty = true
+      this.requestDraw()
+    }
+    image.src = new URL(`./patterns/${key}.png`, document.baseURI).href
+    this.patternTextures.set(key, image)
+    return null
+  }
+
   setSnapshot(snapshot: GameSnapshot): void {
     const previous = this.snapshot
+    if (previous?.phase === 'playing' && snapshot.phase !== 'playing') this.missions = []
     const canPatch = Boolean(
       previous
       && previous.level.id === snapshot.level.id
@@ -99,13 +120,23 @@ export class BoardRenderer {
 
   launch(tasks: StitchTask[]): void {
     const waveStartedAt = performance.now()
-    tasks.forEach((task) => {
+    const prepared = tasks.map((task) => ({
+      task,
+      returnMs: Math.max(360, task.travelMs * (0.62 + (task.workerIndex % 3) * 0.018)),
+    }))
+    const waveSpriteEnd = Math.max(...prepared.map(({ task, returnMs }) => (
+      task.departMs + task.travelMs + CONTACT_MS + returnMs + PORTAL_DROP_MS
+    )))
+    prepared.forEach(({ task, returnMs }) => {
       this.missions.push({
         ...task,
         startedAt: waveStartedAt + task.departMs,
-        returnMs: Math.max(320, task.travelMs * (0.58 + (task.workerIndex % 3) * 0.015)),
-        threadDelayMs: 74 + ((task.workerIndex * 5 + task.row + task.col) % 4) * 31,
-        threadRecoveryMs: 390 + ((task.workerIndex * 7 + task.row * 3 + task.col) % 5) * 47,
+        returnMs,
+        threadDelayMs: Math.max(
+          0,
+          waveSpriteEnd + 140 + task.workerIndex * 74 - task.departMs - task.travelMs - CONTACT_MS,
+        ),
+        threadRecoveryMs: 820 + ((task.workerIndex * 7 + task.row * 3 + task.col) % 5) * 72,
       })
     })
     this.requestDraw()
@@ -202,7 +233,6 @@ export class BoardRenderer {
         ctx.clearRect(0, 0, this.staticCanvas.width, this.staticCanvas.height)
         ctx.drawImage(this.baseCanvas, 0, 0)
         ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
-        this.drawReveal(ctx, geometry)
         this.drawStitches(ctx, geometry)
         this.fullStaticRedraw = false
         this.pendingCleared = []
@@ -335,119 +365,85 @@ export class BoardRenderer {
     ctx.beginPath()
     ctx.arc(geo.centerX, geo.centerY, geo.fabricRadius, 0, Math.PI * 2)
     ctx.clip()
-    ctx.fillStyle = '#fff9ec'
+    const cloth = ctx.createRadialGradient(
+      geo.centerX - geo.fabricRadius * 0.18,
+      geo.centerY - geo.fabricRadius * 0.22,
+      geo.fabricRadius * 0.08,
+      geo.centerX,
+      geo.centerY,
+      geo.fabricRadius,
+    )
+    cloth.addColorStop(0, '#fffdf5')
+    cloth.addColorStop(0.68, '#fbf3e2')
+    cloth.addColorStop(1, '#e9dcc5')
+    ctx.fillStyle = cloth
     ctx.fillRect(
       geo.centerX - geo.fabricRadius,
       geo.centerY - geo.fabricRadius,
       geo.fabricRadius * 2,
       geo.fabricRadius * 2,
     )
-    ctx.lineWidth = 0.7
-    ctx.strokeStyle = 'rgba(150, 132, 108, .18)'
-    for (let x = geo.centerX - geo.fabricRadius; x <= geo.centerX + geo.fabricRadius; x += Math.max(4, geo.cellSize / 4)) {
+    const weave = Math.max(3.2, geo.cellSize)
+    const startX = geo.centerX - Math.ceil(geo.fabricRadius / weave) * weave
+    const startY = geo.centerY - Math.ceil(geo.fabricRadius / weave) * weave
+    ctx.lineWidth = Math.max(0.55, weave * 0.12)
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'
+    for (let x = startX; x <= geo.centerX + geo.fabricRadius; x += weave) {
       ctx.beginPath()
-      ctx.moveTo(x, geo.centerY - geo.fabricRadius)
-      ctx.lineTo(x, geo.centerY + geo.fabricRadius)
+      ctx.moveTo(x - weave * 0.1, geo.centerY - geo.fabricRadius)
+      ctx.lineTo(x - weave * 0.1, geo.centerY + geo.fabricRadius)
       ctx.stroke()
     }
-    for (let y = geo.centerY - geo.fabricRadius; y <= geo.centerY + geo.fabricRadius; y += Math.max(4, geo.cellSize / 4)) {
+    for (let y = startY; y <= geo.centerY + geo.fabricRadius; y += weave) {
       ctx.beginPath()
-      ctx.moveTo(geo.centerX - geo.fabricRadius, y)
-      ctx.lineTo(geo.centerX + geo.fabricRadius, y)
+      ctx.moveTo(geo.centerX - geo.fabricRadius, y - weave * 0.1)
+      ctx.lineTo(geo.centerX + geo.fabricRadius, y - weave * 0.1)
       ctx.stroke()
     }
+    ctx.lineWidth = Math.max(0.45, weave * 0.08)
+    ctx.strokeStyle = 'rgba(131,106,79,.2)'
+    for (let x = startX; x <= geo.centerX + geo.fabricRadius; x += weave) {
+      ctx.beginPath(); ctx.moveTo(x + weave * 0.12, geo.centerY - geo.fabricRadius); ctx.lineTo(x + weave * 0.12, geo.centerY + geo.fabricRadius); ctx.stroke()
+    }
+    for (let y = startY; y <= geo.centerY + geo.fabricRadius; y += weave) {
+      ctx.beginPath(); ctx.moveTo(geo.centerX - geo.fabricRadius, y + weave * 0.12); ctx.lineTo(geo.centerX + geo.fabricRadius, y + weave * 0.12); ctx.stroke()
+    }
+    const holes = new Path2D()
+    const holeRadius = Math.max(0.32, Math.min(0.72, weave * 0.1))
+    for (let y = startY; y <= geo.centerY + geo.fabricRadius; y += weave) {
+      for (let x = startX; x <= geo.centerX + geo.fabricRadius; x += weave) {
+        if (Math.hypot(x - geo.centerX, y - geo.centerY) > geo.fabricRadius - 1) continue
+        holes.moveTo(x + holeRadius, y)
+        holes.arc(x, y, holeRadius, 0, Math.PI * 2)
+      }
+    }
+    ctx.fillStyle = 'rgba(91,69,52,.24)'
+    ctx.fill(holes)
     ctx.restore()
-  }
-
-  private drawReveal(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
-    if (!this.snapshot) return
-    if (this.snapshot.phase !== 'complete') return
-    ctx.save()
-    ctx.beginPath()
-    this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
-      if (!cell.color || !cell.cleared) return
-      const inset = 1
-      ctx.rect(
-        geo.left + colIndex * geo.cellSize + inset,
-        geo.top + rowIndex * geo.cellSize + inset,
-        geo.cellSize - inset * 2,
-        geo.cellSize - inset * 2,
-      )
-    }))
-    ctx.clip()
-    if (this.snapshot.level.reveal === 'sprout') this.drawSprout(ctx, geo)
-    else this.drawMoth(ctx, geo)
-    ctx.restore()
-  }
-
-  private drawSprout(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
-    const cx = geo.left + geo.width / 2
-    const cy = geo.top + geo.height / 2 + geo.height * 0.06
-    ctx.fillStyle = '#f7e6b9'
-    ctx.fillRect(geo.left, geo.top, geo.width, geo.height)
-    ctx.strokeStyle = '#778f62'
-    ctx.lineWidth = Math.max(3, geo.cellSize * 0.18)
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(cx, cy + geo.height * 0.27)
-    ctx.quadraticCurveTo(cx - 4, cy + 8, cx + 2, cy - geo.height * 0.18)
-    ctx.stroke()
-    ctx.fillStyle = '#73a66d'
-    ctx.beginPath()
-    ctx.ellipse(cx - geo.width * 0.11, cy - geo.height * 0.09, geo.width * 0.13, geo.height * 0.07, -0.55, 0, Math.PI * 2)
-    ctx.ellipse(cx + geo.width * 0.1, cy - geo.height * 0.16, geo.width * 0.13, geo.height * 0.07, 0.55, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = '#2f3b31'
-    ctx.beginPath()
-    ctx.arc(cx - 6, cy + geo.height * 0.12, 2.1, 0, Math.PI * 2)
-    ctx.arc(cx + 6, cy + geo.height * 0.12, 2.1, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#2f3b31'
-    ctx.lineWidth = 1.8
-    ctx.beginPath()
-    ctx.arc(cx, cy + geo.height * 0.12, 8, 0.25, Math.PI - 0.25)
-    ctx.stroke()
-  }
-
-  private drawMoth(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
-    const cx = geo.left + geo.width / 2
-    const cy = geo.top + geo.height / 2
-    const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, geo.width * 0.7)
-    grad.addColorStop(0, '#fff2c9')
-    grad.addColorStop(1, '#9ca8c7')
-    ctx.fillStyle = grad
-    ctx.fillRect(geo.left, geo.top, geo.width, geo.height)
-    ctx.fillStyle = '#e8d7ee'
-    ctx.beginPath()
-    ctx.ellipse(cx - geo.width * 0.18, cy, geo.width * 0.2, geo.height * 0.27, -0.45, 0, Math.PI * 2)
-    ctx.ellipse(cx + geo.width * 0.18, cy, geo.width * 0.2, geo.height * 0.27, 0.45, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#735f86'
-    ctx.lineWidth = 3
-    ctx.stroke()
-    ctx.fillStyle = '#5a5067'
-    ctx.beginPath()
-    ctx.ellipse(cx, cy + 3, geo.width * 0.055, geo.height * 0.22, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#5a5067'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(cx - 3, cy - geo.height * 0.2)
-    ctx.quadraticCurveTo(cx - geo.width * 0.11, cy - geo.height * 0.35, cx - geo.width * 0.16, cy - geo.height * 0.27)
-    ctx.moveTo(cx + 3, cy - geo.height * 0.2)
-    ctx.quadraticCurveTo(cx + geo.width * 0.11, cy - geo.height * 0.35, cx + geo.width * 0.16, cy - geo.height * 0.27)
-    ctx.stroke()
-    ctx.fillStyle = '#f2c14e'
-    ;[-1, 1].forEach((side) => {
-      ctx.beginPath()
-      ctx.arc(cx + side * geo.width * 0.19, cy - geo.height * 0.02, geo.width * 0.035, 0, Math.PI * 2)
-      ctx.fill()
-    })
   }
 
   private drawStitches(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
     if (!this.snapshot) return
-    if (this.snapshot.level.density >= 3) {
+    const texture = this.patternTexture(this.snapshot.level.reveal)
+    if (texture) {
+      const visible = new Path2D()
+      this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+        if (!cell.color || cell.cleared) return
+        visible.rect(
+          geo.left + colIndex * geo.cellSize,
+          geo.top + rowIndex * geo.cellSize,
+          geo.cellSize + 0.08,
+          geo.cellSize + 0.08,
+        )
+      }))
+      ctx.save()
+      ctx.clip(visible)
+      ctx.drawImage(texture, geo.left, geo.top, geo.width, geo.height)
+      ctx.restore()
+      this.drawReachableHighlights(ctx, geo)
+      return
+    }
+    if (this.snapshot.level.density >= 3 || geo.cellSize < 7) {
       this.drawDenseStitches(ctx, geo)
       return
     }
@@ -465,7 +461,6 @@ export class BoardRenderer {
     if (!this.snapshot) return
     const size = geo.cellSize * 0.985
     const pad = size * 0.17
-    const tiles = new Map<ThreadColor, Path2D>()
     const crosses = new Map<ThreadColor, Path2D>()
     const highlights = new Path2D()
 
@@ -475,29 +470,41 @@ export class BoardRenderer {
       const y = geo.top + (rowIndex + 0.5) * geo.cellSize
       const left = x - size / 2
       const top = y - size / 2
-      const tilePath = tiles.get(cell.color) ?? new Path2D()
       const crossPath = crosses.get(cell.color) ?? new Path2D()
-      tilePath.rect(left, top, size, size)
       crossPath.moveTo(left + pad, top + pad)
       crossPath.lineTo(left + size - pad, top + size - pad)
       crossPath.moveTo(left + size - pad, top + pad)
       crossPath.lineTo(left + pad, top + size - pad)
-      tiles.set(cell.color, tilePath)
       crosses.set(cell.color, crossPath)
       if (this.snapshot!.reachable.has(cellKey(rowIndex, colIndex))) highlights.rect(left + 0.5, top + 0.5, size - 1, size - 1)
     }))
 
-    tiles.forEach((path, color) => {
-      ctx.fillStyle = THREAD_COLORS[color].dark
-      ctx.fill(path)
-    })
     ctx.save()
     ctx.lineCap = 'round'
-    ctx.lineWidth = Math.max(0.8, size * 0.23)
+    ctx.translate(0, Math.max(0.3, size * 0.06))
+    ctx.globalAlpha = 0.28
+    ctx.lineWidth = Math.max(1.1, size * 0.56)
+    ctx.strokeStyle = '#332a35'
+    crosses.forEach((path) => ctx.stroke(path))
+    ctx.translate(0, -Math.max(0.3, size * 0.06))
+    ctx.globalAlpha = 1
+    ctx.lineWidth = Math.max(1, size * 0.48)
     crosses.forEach((path, color) => {
-      ctx.strokeStyle = THREAD_COLORS[color].hex
+      ctx.strokeStyle = this.thread(color).dark
       ctx.stroke(path)
     })
+    ctx.lineWidth = Math.max(0.8, size * 0.32)
+    crosses.forEach((path, color) => {
+      ctx.strokeStyle = this.thread(color).hex
+      ctx.stroke(path)
+    })
+    ctx.globalAlpha = 0.7
+    ctx.lineWidth = Math.max(0.45, size * 0.08)
+    crosses.forEach((path, color) => {
+      ctx.strokeStyle = this.thread(color).light
+      ctx.stroke(path)
+    })
+    ctx.globalAlpha = 1
     ctx.lineWidth = 0.65
     ctx.strokeStyle = 'rgba(255,255,255,.72)'
     ctx.stroke(highlights)
@@ -513,7 +520,7 @@ export class BoardRenderer {
     accessible: boolean,
     pulse: number,
   ): void {
-    const thread = THREAD_COLORS[color]
+    const thread = this.thread(color)
     const left = x - size / 2
     const top = y - size / 2
     const pad = size * 0.16
@@ -552,7 +559,7 @@ export class BoardRenderer {
   }
 
   private drawSymbol(ctx: CanvasRenderingContext2D, color: ThreadColor, x: number, y: number, size: number): void {
-    const symbol = THREAD_COLORS[color].symbol
+    const symbol = this.thread(color).symbol
     ctx.save()
     ctx.strokeStyle = 'rgba(255,255,255,.9)'
     ctx.fillStyle = 'rgba(255,255,255,.9)'
@@ -610,7 +617,7 @@ export class BoardRenderer {
       const gait = elapsed / (108 + mission.workerIndex % 4 * 8) + mission.workerIndex * 0.73
       ctx.save()
       const sizeVariation = 0.92 + ((mission.workerIndex * 7) % 5) * 0.04
-      const radius = Math.max(6.2, geo.cellSize * 1.22 * sizeVariation)
+      const radius = Math.max(7.3, geo.cellSize * 1.42 * sizeVariation)
       const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
       const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
       const targetY = geo.top + (mission.row + 0.5) * geo.cellSize
@@ -648,7 +655,7 @@ export class BoardRenderer {
     color: ThreadColor,
     progress: number,
   ): void {
-    const thread = THREAD_COLORS[color]
+    const thread = this.thread(color)
     const lift = 1 - Math.pow(1 - Math.min(1, progress / 0.48), 3)
     const coil = Math.max(0, Math.min(1, (progress - 0.28) / 0.72))
     const pullAngle = Math.atan2(workerY - targetY, workerX - targetX)
@@ -741,7 +748,7 @@ export class BoardRenderer {
     progress: number,
     workerIndex: number,
   ): void {
-    const thread = THREAD_COLORS[color]
+    const thread = this.thread(color)
     const eased = progress < 0.5
       ? 4 * progress * progress * progress
       : 1 - Math.pow(-2 * progress + 2, 3) / 2
@@ -854,7 +861,10 @@ export class BoardRenderer {
     airborne: boolean,
     pullProgress: number,
   ): void {
-    const thread = THREAD_COLORS[color]
+    const thread = this.thread(color)
+    const body = '#34343d'
+    const bodyDark = '#202029'
+    const bodyLight = '#64646f'
     const step = this.reducedMotion ? 0 : Math.sin(gait * Math.PI * 2) * (airborne ? 0.28 : 1)
     const tug = this.reducedMotion ? 0 : Math.sin(Math.min(1, pullProgress) * Math.PI)
     const lift = Math.abs(step) * radius * 0.08
@@ -871,7 +881,7 @@ export class BoardRenderer {
     ctx.translate(0, bodyOffset)
     ctx.rotate(direction + Math.PI / 2 + tug * 0.13)
 
-    ctx.strokeStyle = thread.dark
+    ctx.strokeStyle = bodyDark
     ctx.lineWidth = Math.max(1.1, radius * 0.16)
     ctx.lineCap = 'round'
     ;[-1, 1].forEach((side, index) => {
@@ -892,31 +902,29 @@ export class BoardRenderer {
     ctx.moveTo(radius * 0.25, -radius * 0.7)
     ctx.quadraticCurveTo(radius * 0.55, -radius * 1.12, radius * 0.78, -radius * 1.04)
     ctx.stroke()
-    ctx.fillStyle = thread.light
+    ctx.fillStyle = bodyLight
     ctx.beginPath()
     ctx.arc(-radius * 0.56, -radius * 1.25, radius * 0.13, 0, Math.PI * 2)
     ctx.arc(radius * 0.78, -radius * 1.04, radius * 0.13, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = thread.hex
+    ctx.fillStyle = body
     ctx.beginPath()
     ctx.ellipse(0, 0, radius * 0.9, radius * 0.78, -0.1, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
-    // Large pale bib + unique symbol keeps workers identifiable beyond hue alone.
-    ctx.fillStyle = 'rgba(255,253,245,.86)'
+    ctx.fillStyle = '#45454f'
     ctx.beginPath()
     ctx.ellipse(0, radius * 0.28, radius * 0.48, radius * 0.31, -0.08, 0, Math.PI * 2)
     ctx.fill()
-    this.drawSymbol(ctx, color, 0, radius * 0.3, radius * 0.34)
     ctx.fillStyle = '#fffdf5'
     ctx.beginPath()
     ctx.arc(-radius * 0.28, -radius * 0.12, radius * 0.17, 0, Math.PI * 2)
     ctx.arc(radius * 0.24, -radius * 0.15, radius * 0.17, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#292833'
+    ctx.fillStyle = thread.hex
     ctx.beginPath()
-    ctx.arc(-radius * 0.23, -radius * 0.1, radius * 0.075, 0, Math.PI * 2)
-    ctx.arc(radius * 0.29, -radius * 0.13, radius * 0.075, 0, Math.PI * 2)
+    ctx.arc(-radius * 0.23, -radius * 0.1, radius * 0.085, 0, Math.PI * 2)
+    ctx.arc(radius * 0.29, -radius * 0.13, radius * 0.085, 0, Math.PI * 2)
     ctx.fill()
     ctx.strokeStyle = '#9a9ba2'
     ctx.lineWidth = Math.max(1.2, radius * 0.11)

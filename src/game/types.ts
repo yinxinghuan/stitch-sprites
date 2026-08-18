@@ -18,11 +18,14 @@ export interface SpoolState extends SpoolDefinition {
 export interface LevelDefinition {
   id: number
   titleKey: string
-  reveal: 'sprout' | 'moth'
+  completeKey: string
+  reveal: string
   density: number
   rows: string[]
   columns: SpoolDefinition[][]
+  solution: number[]
   tutorial: boolean
+  displayPalette: Partial<Record<ThreadColor, string>>
 }
 
 export interface ActiveSlot {

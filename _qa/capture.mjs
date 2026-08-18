@@ -13,8 +13,14 @@ const externalOnly = process.env.STITCH_SPRITES_QA_EXTERNAL_ONLY === '1'
 const browser = await chromium.launch({ headless: true })
 const errors = []
 
-async function open(viewport, level, hideGuest = true) {
+async function open(viewport, level, hideGuest = true, accelerate = false) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'zh-CN' })
+  if (accelerate) {
+    await context.addInitScript(() => {
+      const nativeSetTimeout = window.setTimeout.bind(window)
+      window.setTimeout = (handler, timeout = 0, ...args) => nativeSetTimeout(handler, Math.min(timeout, 24), ...args)
+    })
+  }
   await context.addInitScript(() => {
     localStorage.setItem('alteru:68c68c63-9eee-4ee5-a46b-f453d2e8c6bf:game_locale', 'zh')
   })
@@ -26,7 +32,7 @@ async function open(viewport, level, hideGuest = true) {
     errors.push(`console: ${text}`)
   })
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
-  await page.goto(`${baseUrl}?level=${level}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${baseUrl}?level=${level}`, { waitUntil: 'commit' })
   await page.locator('.ss-app').waitFor({ state: 'visible' })
   await page.waitForTimeout(350)
   if (hideGuest) await page.addStyleTag({ content: '#alteru-guest-banner{display:none!important}' })
@@ -52,8 +58,6 @@ async function selectPath(page, columns) {
     await spool.waitFor({ state: 'visible' })
     await spool.click()
     await page.waitForTimeout(120)
-    // A full 108-stitch reel now releases larger workers with an 82ms queue cadence;
-    // nine visible waves can legitimately take a little over the old 20s ceiling.
     await page.waitForFunction(() => document.querySelectorAll('.ss-slot--working').length === 0, null, { timeout: 30000 })
   }
 }
@@ -65,38 +69,33 @@ if (!externalOnly) {
   await page.locator('[data-column="0"]').click()
   await page.waitForTimeout(950)
   await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level1-after-first-action-390x844.png`) })
+  await context.close()
+}
 
-  await selectPath(page, [0, 0, 1, 1, 1, 2, 2, 2, 3])
-  await page.waitForTimeout(900)
+{
+  const { context, page } = await open({ width: 390, height: 844 }, 1, true, true)
+  await selectPath(page, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+  await page.waitForTimeout(100)
   if (!await page.locator('.ss-result--complete').count()) throw new Error('Level 1 correct path did not complete')
   await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level1-complete-390x844.png`) })
   await context.close()
 }
 
 {
-  const { context, page } = await open({ width: 390, height: 844 }, 2)
-  for (const column of [1, 1, 2, 2, 3]) {
+  const { context, page } = await open({ width: 390, height: 844 }, 7)
+  for (const column of [1, 1, 1, 1, 1]) {
     await page.locator(`[data-column="${column}"]`).click()
     await page.waitForTimeout(90)
   }
   await page.waitForTimeout(500)
-  if (!await page.locator('.ss-result--failed').count()) throw new Error('Level 2 failure path did not fail')
-  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level2-failed-390x844.png`) })
+  if (!await page.locator('.ss-result--failed').count()) throw new Error('Level 7 failure path did not fail')
+  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level7-failed-390x844.png`) })
   await context.close()
 }
 
 {
-  const { context, page } = await open({ width: 320, height: 568 }, 2)
-  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level2-initial-320x568.png`) })
-  await context.close()
-}
-
-{
-  const { context, page } = await open({ width: 390, height: 844 }, 2)
-  await selectPath(page, [0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3])
-  await page.waitForTimeout(900)
-  if (!await page.locator('.ss-result--complete').count()) throw new Error('Level 2 correct path did not complete')
-  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level2-complete-390x844.png`) })
+  const { context, page } = await open({ width: 320, height: 568 }, 35)
+  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level35-initial-320x568.png`) })
   await context.close()
 }
 }

@@ -21,10 +21,10 @@ await page.waitForTimeout(250)
 
 const remaining = async () => Number((await page.locator('.ss-remaining').textContent())?.match(/\d+/)?.[0] ?? NaN)
 const initial = await remaining()
-if (initial !== 792) throw new Error(`Expected 792 initial stitches, got ${initial}`)
+if (!Number.isFinite(initial) || initial < 100) throw new Error(`Expected a populated high-resolution pattern, got ${initial}`)
 
 await page.locator('[data-column="0"]').click()
-const checkpoints = [0, 160, 340, 460, 540, 620, 720, 860, 1020, 1220, 1450, 2400, 3200]
+const checkpoints = [0, 180, 360, 540, 720, 920, 1160, 1460, 1780, 2200, 2700, 3300, 4100, 5000, 5900, 6800]
 let elapsed = 0
 const readings = []
 for (const checkpoint of checkpoints) {
@@ -35,10 +35,10 @@ for (const checkpoint of checkpoints) {
   await page.screenshot({ path: path.join(outputDir, `${pass}-${String(checkpoint).padStart(4, '0')}ms-390x844.png`) })
 }
 
-if (readings.find(({ checkpoint }) => checkpoint === 340)?.remaining !== initial) {
+if (readings.find(({ checkpoint }) => checkpoint === 360)?.remaining !== initial) {
   throw new Error(`Stitches changed before the first visible walking beat: ${JSON.stringify(readings)}`)
 }
-const firstResult = readings.find(({ checkpoint }) => checkpoint === 720)?.remaining ?? initial
+const firstResult = readings.find(({ checkpoint }) => checkpoint === 920)?.remaining ?? initial
 if (!(firstResult < initial)) {
   throw new Error(`No visible work result after arrival: ${JSON.stringify(readings)}`)
 }

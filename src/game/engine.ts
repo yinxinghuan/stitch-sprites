@@ -49,6 +49,10 @@ export class GameEngine {
     }
   }
 
+  get unlockedLevel(): number {
+    return Math.max(1, Math.min(LEVELS.length, Number(alteruLocalStorage.getItem('stitch_sprites_level') ?? '1') || 1))
+  }
+
   canSelectColumn(index: number): boolean {
     if (this.phase !== 'playing' || this.slots.length >= 5) return false
     const spool = this.columns[index]?.[0]
@@ -78,6 +82,11 @@ export class GameEngine {
   next(): void {
     const nextIndex = (this.levelIndex + 1) % LEVELS.length
     this.loadLevel(nextIndex)
+  }
+
+  openLevel(levelId: number): void {
+    if (!Number.isInteger(levelId) || levelId < 1 || levelId > this.unlockedLevel) return
+    this.loadLevel(levelId - 1)
   }
 
   currentNeededColors(): ThreadColor[] {
@@ -149,8 +158,8 @@ export class GameEngine {
           reserved.add(`${target.row}:${target.col}`)
           const paceVariation = ((workerIndex * 17 + target.row * 3 + target.col) % 7 - 3) * 14
           const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18 + paceVariation))
-          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 6
-          const departMs = workerIndex * 82 + queueJitter
+          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 8
+          const departMs = workerIndex * 132 + queueJitter
           tasks.push({
             slotId: slot.slotId,
             color: slot.spool.color,
@@ -208,7 +217,7 @@ export class GameEngine {
       const remaining = this.snapshot.remaining
       if (remaining === 0) {
         this.phase = 'complete'
-        const unlockedLevel = Math.min(LEVELS.length, this.levelIndex + 2)
+        const unlockedLevel = Math.max(this.unlockedLevel, Math.min(LEVELS.length, this.levelIndex + 2))
         alteruLocalStorage.setItem('stitch_sprites_level', String(unlockedLevel))
         this.audio.complete()
         this.emit()
