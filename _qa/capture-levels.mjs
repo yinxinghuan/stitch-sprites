@@ -9,6 +9,7 @@ const outputDir = path.join(qaDir, 'ui')
 const baseUrl = process.env.STITCH_SPRITES_URL || 'http://127.0.0.1:5180/'
 const pass = process.env.STITCH_SPRITES_QA_PASS || 'full-levels-first-pass'
 const requestedLevel = Number(process.env.STITCH_SPRITES_LEVEL || 0)
+const levelCount = Number(process.env.STITCH_SPRITES_LEVEL_COUNT || 41)
 const includeNarrow = process.env.STITCH_SPRITES_NARROW === '1'
 const externalGuest = process.env.STITCH_SPRITES_EXTERNAL_GUEST === '1'
 const browser = await chromium.launch({ headless: true })
@@ -65,11 +66,11 @@ async function capture(level, viewport) {
 
 const results = []
 const firstLevel = requestedLevel > 0 ? requestedLevel : 1
-const lastLevel = requestedLevel > 0 ? requestedLevel : 42
+const lastLevel = requestedLevel > 0 ? requestedLevel : levelCount
 for (let level = firstLevel; level <= lastLevel; level += 1) {
   results.push(await capture(level, { width: 390, height: 844 }))
 }
-if (!requestedLevel || includeNarrow) results.push(await capture(requestedLevel || 42, { width: 320, height: 568 }))
+if (!requestedLevel || includeNarrow) results.push(await capture(requestedLevel || levelCount, { width: 320, height: 568 }))
 await browser.close()
 if (errors.length) throw new Error(errors.join('\n'))
 console.log(JSON.stringify({ ok: true, results }))

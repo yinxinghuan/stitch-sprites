@@ -1,4 +1,4 @@
-export type ThreadColor = 'sun' | 'coral' | 'leaf' | 'lake' | 'violet' | 'ink'
+export type ThreadColor = 'sun' | 'coral' | 'leaf' | 'lake' | 'violet' | 'ink' | 'aqua'
 
 export interface Cell {
   color: ThreadColor | null

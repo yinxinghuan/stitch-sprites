@@ -327,7 +327,7 @@ export class GameView {
     }
     const previousScroll = this.overlay.querySelector<HTMLElement>('.ss-gallery__scroll')?.scrollTop ?? 0
     const colorCount = (level: LevelDefinition): number => new Set(level.rows.join('').replaceAll('.', '')).size
-    const chapters = [2, 3, 4, 5, 6].map((count) => ({
+    const chapters = [2, 3, 4, 5, 6, 7].map((count) => ({
       key: `chapter.colors${count}`,
       levels: LEVELS.filter((level) => colorCount(level) === count),
     })).filter((chapter) => chapter.levels.length)

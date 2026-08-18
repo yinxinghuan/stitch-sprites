@@ -3,7 +3,17 @@ import type { ActiveSlot, GamePhase, SpoolState } from './types'
 
 export const PROGRESS_KEY = 'stitch_sprites_progress_v2'
 export const LEGACY_LEVEL_KEY = 'stitch_sprites_level'
-export const PROGRESS_VERSION = 3
+export const PROGRESS_VERSION = 4
+
+const LEGACY_LEVEL_MAP = new Map<number, number>([
+  [2, 1],
+  [4, 2],
+  [5, 3],
+  [9, 4],
+  [13, 5],
+  [20, 6],
+  [27, 7],
+])
 
 export interface StableRunState {
   levelId: number
@@ -58,14 +68,18 @@ export function normalizeProgress(value: unknown): PersistedProgress | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<PersistedProgress>
   const sourceVersion = Number(candidate.version)
-  if (sourceVersion !== 2 && sourceVersion !== PROGRESS_VERSION) return null
+  if (sourceVersion !== 2 && sourceVersion !== 3 && sourceVersion !== PROGRESS_VERSION) return null
   const bestByLevel: Record<string, number> = {}
   if (candidate.bestByLevel && typeof candidate.bestByLevel === 'object') {
     Object.entries(candidate.bestByLevel).forEach(([key, score]) => {
       const levelId = Number(key)
       const numericScore = Number(score)
-      if (Number.isInteger(levelId) && levelId >= 1 && levelId <= LEVELS.length && Number.isFinite(numericScore) && numericScore > 0) {
-        bestByLevel[String(levelId)] = Math.floor(numericScore)
+      const migratedLevelId = sourceVersion === PROGRESS_VERSION ? levelId : LEGACY_LEVEL_MAP.get(levelId)
+      if (migratedLevelId && migratedLevelId <= LEVELS.length && Number.isFinite(numericScore) && numericScore > 0) {
+        const adjustedScore = sourceVersion === PROGRESS_VERSION
+          ? numericScore
+          : numericScore - levelId * 25 + migratedLevelId * 25
+        bestByLevel[String(migratedLevelId)] = Math.max(1, Math.floor(adjustedScore))
       }
     })
   }
@@ -75,9 +89,14 @@ export function normalizeProgress(value: unknown): PersistedProgress | null {
     ? structuredClone(candidate.currentRun)
     : null
   const storedUnlockedLevel = clampLevel(candidate.unlockedLevel)
-  const unlockedLevel = LEVELS.length > 35 && storedUnlockedLevel >= 35 && bestByLevel['35']
-    ? Math.max(storedUnlockedLevel, 36)
-    : storedUnlockedLevel
+  let unlockedLevel = storedUnlockedLevel
+  if (sourceVersion !== PROGRESS_VERSION) {
+    unlockedLevel = 1
+    LEGACY_LEVEL_MAP.forEach((newId, oldId) => {
+      if (oldId <= Number(candidate.unlockedLevel)) unlockedLevel = Math.max(unlockedLevel, newId)
+      if (bestByLevel[String(newId)]) unlockedLevel = Math.max(unlockedLevel, Math.min(LEVELS.length, newId + 1))
+    })
+  }
   return {
     version: PROGRESS_VERSION,
     updatedAt: Number.isFinite(Number(candidate.updatedAt)) ? Number(candidate.updatedAt) : Date.now(),

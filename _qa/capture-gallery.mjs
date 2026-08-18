@@ -8,6 +8,7 @@ const qaDir = path.dirname(fileURLToPath(import.meta.url))
 const outputDir = path.join(qaDir, 'ui')
 const baseUrl = process.env.STITCH_SPRITES_URL || 'http://127.0.0.1:5180/'
 const pass = process.env.STITCH_SPRITES_QA_PASS || 'full-gallery-first-pass'
+const levelCount = Number(process.env.STITCH_SPRITES_LEVEL_COUNT || 41)
 const browser = await chromium.launch({ headless: true })
 
 async function capture(viewport, unlocked) {
@@ -36,11 +37,11 @@ async function capture(viewport, unlocked) {
       return style.borderRadius !== '50%' || !style.clipPath.includes('circle')
     }).length,
   }))
-  if (result.cards !== 42 || result.enabled !== unlocked || result.scrollWidth > result.width || result.undersized || result.unclippedThumbnails) {
+  if (result.cards !== levelCount || result.enabled !== unlocked || result.scrollWidth > result.width || result.undersized || result.unclippedThumbnails) {
     throw new Error(`Gallery contract failed: ${JSON.stringify(result)}`)
   }
   await page.screenshot({ path: path.join(outputDir, `${pass}-unlocked${unlocked}-${viewport.width}x${viewport.height}.png`) })
-  if (unlocked === 42) {
+  if (unlocked === levelCount) {
     const scroller = page.locator('.ss-gallery__scroll')
     await scroller.evaluate((element) => { element.scrollTop = element.scrollHeight })
     await page.waitForTimeout(180)
@@ -56,8 +57,8 @@ async function capture(viewport, unlocked) {
 
 const results = [
   await capture({ width: 390, height: 844 }, 1),
-  await capture({ width: 390, height: 844 }, 42),
-  await capture({ width: 320, height: 568 }, 42),
+  await capture({ width: 390, height: 844 }, levelCount),
+  await capture({ width: 320, height: 568 }, levelCount),
 ]
 await browser.close()
 console.log(JSON.stringify({ ok: true, results }))

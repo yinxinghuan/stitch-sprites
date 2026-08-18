@@ -576,6 +576,8 @@ export class BoardRenderer {
       ctx.beginPath(); ctx.moveTo(x, y - size * 0.72); ctx.lineTo(x + size * 0.72, y + size * 0.55); ctx.lineTo(x - size * 0.72, y + size * 0.55); ctx.closePath(); ctx.fill()
     } else if (symbol === 'bar') {
       ctx.beginPath(); ctx.moveTo(x - size * 0.7, y); ctx.lineTo(x + size * 0.7, y); ctx.stroke()
+    } else if (symbol === 'square') {
+      ctx.strokeRect(x - size * 0.52, y - size * 0.52, size * 1.04, size * 1.04)
     } else {
       ctx.beginPath(); ctx.moveTo(x - size * 0.55, y - size * 0.55); ctx.lineTo(x + size * 0.55, y + size * 0.55); ctx.moveTo(x + size * 0.55, y - size * 0.55); ctx.lineTo(x - size * 0.55, y + size * 0.55); ctx.stroke()
     }
@@ -619,7 +621,8 @@ export class BoardRenderer {
       const gait = elapsed / (108 + mission.workerIndex % 4 * 8) + mission.workerIndex * 0.73
       ctx.save()
       const sizeVariation = 0.92 + ((mission.workerIndex * 7) % 5) * 0.04
-      const radius = Math.max(8.6, geo.cellSize * 1.58 * sizeVariation)
+      const effectRadius = Math.max(8.6, geo.cellSize * 1.58 * sizeVariation)
+      const radius = Math.max(10.2, geo.cellSize * 1.86 * sizeVariation)
       const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
       const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
       const targetY = geo.top + (mission.row + 0.5) * geo.cellSize
@@ -628,7 +631,7 @@ export class BoardRenderer {
         : direction
       if (elapsed >= returnStart && elapsed < threadStart + mission.threadRecoveryMs) {
         const threadProgress = Math.max(0, Math.min(1, (elapsed - threadStart) / mission.threadRecoveryMs))
-        this.drawThreadRecovery(ctx, targetX, targetY, radius, mission.color, threadProgress, mission.workerIndex)
+        this.drawThreadRecovery(ctx, targetX, targetY, effectRadius, mission.color, threadProgress, mission.workerIndex)
       }
       if (dropping) {
         const easedDrop = dropProgress * dropProgress
@@ -640,7 +643,7 @@ export class BoardRenderer {
       } else {
         this.drawSprite(ctx, x, y, radius, mission.color, gait, spriteDirection, returning, elapsed >= mission.travelMs ? contactProgress : 0)
         if (!returning && elapsed >= mission.travelMs) {
-          this.drawExtraction(ctx, targetX, targetY, x, y, radius, mission.color, contactProgress)
+          this.drawExtraction(ctx, targetX, targetY, x, y, effectRadius, mission.color, contactProgress)
         }
       }
       ctx.restore()

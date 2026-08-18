@@ -24,40 +24,12 @@ PALETTE = {
     "B": "#4E9CCC",
     "P": "#8E75C5",
     "K": "#3B3A47",
+    "C": "#35BFC2",
 }
 
 PEEL_PRIORITY = tuple(PALETTE)
 COLUMN_WEAVE = (0, 1, 2, 3, 1, 0, 3, 2, 0, 2, 1, 3)
 RUN_COLUMN_PAIRS = ((0, 1), (2, 3), (1, 3), (0, 2), (0, 3), (1, 2))
-
-# Phase-one difficulty probes. These levels must prove that a correct solution
-# can intentionally carry 1 / 2 / 3 reels across a later color opening before
-# the same contract is expanded to the full chapter curve.
-DIFFICULTY_V2_SAMPLES = {10: 1, 27: 2, 35: 3}
-
-# Topology-first expansion levels are appended after the established 35-level
-# collection so existing progress ids remain stable. Their art was generated as
-# a concept sheet, but acceptance is mechanical: each key carries its own
-# intended standard-solution waiting pressure.
-CHALLENGE_CARRY_TARGETS = {
-    "gardenLantern": 1,
-    "nestingDoll": 1,
-    "aquarium": 2,
-    "sleepingFox": 2,
-    "carouselBox": 3,
-    "clockworkOwl": 3,
-    "greenhouse": 4,
-}
-CHALLENGE_ORDER = tuple(CHALLENGE_CARRY_TARGETS)
-CHALLENGE_SHELLS = {
-    "gardenLantern": "P",
-    "nestingDoll": "R",
-    "aquarium": "P",
-    "sleepingFox": "P",
-    "carouselBox": "B",
-    "clockworkOwl": "P",
-    "greenhouse": "P",
-}
 
 HUES = {
     code: colorsys.rgb_to_hsv(*(int(color[index:index + 2], 16) / 255 for index in (1, 3, 5)))[0]
@@ -65,53 +37,61 @@ HUES = {
     if code != "K"
 }
 
-# One visible stitch in the approved reference maps to one gameplay point.
-# The final number is the source-sheet pixel pitch of one photographed stitch.
-# There is deliberately no target resolution: the chart is never rescaled.
+# One visible stitch in an approved reference maps to one gameplay point. The
+# final number is the source-sheet pixel pitch of one photographed stitch.
+# There is deliberately no target resolution: charts are never rescaled.
 SOURCES = [
-    ("watermelon", "chapter-one-candidate-b.png", 4, 2, 0, 7),
     ("ladybug", "chapter-one-candidate-b.png", 4, 2, 1, 7),
-    ("turtle", "chapter-one-candidate-b.png", 4, 2, 2, 7),
-    ("whale", "chapter-one-candidate-b.png", 4, 2, 3, 7),
-    ("butterfly", "chapter-one-candidate-b.png", 4, 2, 4, 7),
-    ("teapot", "chapter-one-candidate-b.png", 4, 2, 5, 7),
-    ("moonCat", "chapter-one-candidate-b.png", 4, 2, 6, 7),
-    ("cottage", "chapter-one-candidate-b.png", 4, 2, 7, 7),
-    ("yarn", "chapter-one-candidate-c.png", 4, 2, 1, 7),
-    ("mitten", "chapter-one-candidate-c.png", 4, 2, 2, 7),
-    ("sweater", "chapter-one-candidate-c.png", 4, 2, 3, 7),
-    ("clock", "chapter-one-candidate-c.png", 4, 2, 4, 7),
-    ("basket", "chapter-one-candidate-c.png", 4, 2, 5, 7),
-    ("musicBox", "chapter-one-candidate-c.png", 4, 2, 6, 7),
-    ("craftRoom", "chapter-one-candidate-c.png", 4, 2, 7, 7),
-    ("potion", "chapter-one-candidate-d.png", 4, 2, 0, 7),
-    ("slime", "chapter-one-candidate-d.png", 4, 2, 1, 7),
     ("spellbook", "chapter-one-candidate-d.png", 4, 2, 2, 7),
-    ("mushroomHome", "chapter-one-candidate-d.png", 4, 2, 3, 7),
-    ("moth", "chapter-one-candidate-d.png", 4, 2, 4, 7),
-    ("starCat", "chapter-one-candidate-d.png", 4, 2, 5, 7),
-    ("flowerFox", "chapter-one-candidate-d.png", 4, 2, 6, 7),
-    ("spiritTree", "chapter-one-candidate-d.png", 4, 2, 7, 7),
-    ("umbrella", "chapter-four-candidate-e.png", 4, 2, 0, 5),
+    ("slime", "chapter-one-candidate-d.png", 4, 2, 1, 7),
     ("suitcase", "chapter-four-candidate-e.png", 4, 2, 1, 5),
-    ("bell", "chapter-four-candidate-e.png", 4, 2, 2, 5),
-    ("tram", "chapter-four-candidate-e.png", 4, 2, 3, 5),
+    ("potion", "chapter-one-candidate-d.png", 4, 2, 0, 7),
     ("lighthouse", "chapter-four-candidate-e.png", 4, 2, 4, 5),
-    ("nightTrain", "chapter-four-candidate-e.png", 4, 2, 5, 5),
-    ("observatory", "chapter-four-candidate-e.png", 4, 2, 6, 5),
-    ("city", "chapter-four-candidate-e.png", 4, 2, 7, 5),
-    ("alteruCoral", "alteru-logo-stitch-candidates.png", 2, 2, 0, 8),
-    ("alteruSun", "alteru-logo-stitch-candidates.png", 2, 2, 1, 8),
-    ("alteruNight", "alteru-logo-stitch-candidates.png", 2, 2, 2, 8),
     ("alteruBloom", "alteru-logo-stitch-candidates.png", 2, 2, 3, 8),
-    ("gardenLantern", "topology-challenge-candidates-v1.png", 4, 2, 1, 4),
-    ("clockworkOwl", "topology-challenge-candidates-v1.png", 4, 2, 2, 4),
-    ("aquarium", "topology-challenge-candidates-v1.png", 4, 2, 3, 4),
-    ("nestingDoll", "topology-challenge-candidates-v1.png", 4, 2, 4, 4),
-    ("greenhouse", "topology-challenge-candidates-v1.png", 4, 2, 5, 4),
-    ("sleepingFox", "topology-challenge-candidates-v1.png", 4, 2, 6, 4),
-    ("carouselBox", "topology-challenge-candidates-v1.png", 4, 2, 7, 4),
+
+    # Six-color chapter: only the strongest 17 candidates are transcribed.
+    ("windupHummingbird", "chapter-six-candidates-a.png", 3, 3, 0, 4),
+    ("ribbonCamera", "chapter-six-candidates-a.png", 3, 3, 1, 4),
+    ("hillTerrarium", "chapter-six-candidates-a.png", 3, 3, 2, 4),
+    ("rollerSkate", "chapter-six-candidates-a.png", 3, 3, 3, 4),
+    ("trailBackpack", "chapter-six-candidates-a.png", 3, 3, 6, 4),
+    ("planetLunchbox", "chapter-six-candidates-a.png", 3, 3, 7, 4),
+    ("espressoMachine", "chapter-six-candidates-b.png", 3, 3, 0, 4),
+    ("cassettePlayer", "chapter-six-candidates-b.png", 3, 3, 2, 4),
+    ("hotAirBalloon", "chapter-six-candidates-b.png", 3, 3, 3, 4),
+    ("deskFan", "chapter-six-candidates-b.png", 3, 3, 4, 4),
+    ("foodTruck", "chapter-six-candidates-b.png", 3, 3, 5, 4),
+    ("koiSubmarine", "chapter-six-candidates-b.png", 3, 3, 6, 4),
+    ("gameController", "chapter-six-candidates-b.png", 3, 3, 7, 4),
+    ("snowGlobe", "chapter-six-candidates-b.png", 3, 3, 8, 4),
+    ("domeBakery", "chapter-six-candidates-c.png", 3, 3, 0, 4),
+    ("lunarPod", "chapter-six-candidates-c.png", 3, 3, 4, 4),
+    ("submarinePorthole", "chapter-six-candidates-c.png", 3, 3, 8, 4),
+
+    # Seven-color chapter. The aqua family is a real seventh mechanic and has
+    # its own symbol; it is not a display-only recolor of lake blue.
+    ("moonPhaseClock", "chapter-seven-candidates-a.png", 3, 3, 1, 4),
+    ("domeGreenhouse", "chapter-seven-candidates-a.png", 3, 3, 2, 4),
+    ("synthesizer", "chapter-seven-candidates-b.png", 3, 3, 0, 4),
+    ("vendingMachine", "chapter-seven-candidates-b.png", 3, 3, 2, 4),
+    ("rocketClock", "chapter-seven-candidates-b.png", 3, 3, 3, 4),
+    ("campLantern", "chapter-seven-candidates-b.png", 3, 3, 4, 4),
+    ("arcadeCabinet", "chapter-seven-candidates-b.png", 3, 3, 5, 4),
+    ("mobileLibrary", "chapter-seven-candidates-b.png", 3, 3, 6, 4),
+    ("planetariumProjector", "chapter-seven-candidates-e.png", 3, 3, 0, 4),
+    ("capsuleWorkshop", "chapter-seven-candidates-e.png", 3, 3, 1, 4),
+    ("headphoneStand", "chapter-seven-candidates-e.png", 3, 3, 2, 4),
+    ("weatherStation", "chapter-seven-candidates-e.png", 3, 3, 3, 4),
+    ("jellyfishLamp", "chapter-seven-candidates-e.png", 3, 3, 4, 4),
+    ("deliveryScooter", "chapter-seven-candidates-e.png", 3, 3, 5, 4),
+    ("underwaterCabin", "chapter-seven-candidates-e.png", 3, 3, 6, 4),
+    ("recordShopCart", "chapter-seven-candidates-e.png", 3, 3, 7, 4),
+    ("glassOrrery", "chapter-seven-candidates-e.png", 3, 3, 8, 4),
 ]
+
+EARLY_ORDER = ("ladybug", "spellbook", "slime", "suitcase", "potion", "lighthouse", "alteruBloom")
+SIX_COLOR_KEYS = tuple(key for key, filename, *_ in SOURCES if filename.startswith("chapter-six"))
+SEVEN_COLOR_KEYS = tuple(key for key, filename, *_ in SOURCES if filename.startswith("chapter-seven"))
 
 _STITCH_BOUNDARY_CACHE: dict[tuple[int, int, int], list[int]] = {}
 
@@ -193,19 +173,19 @@ def target_selections(color_count: int, key: str | None = None) -> int:
 
 
 def requested_carry_reels(level: int, key: str | None = None) -> int:
-    if key in CHALLENGE_CARRY_TARGETS:
-        return CHALLENGE_CARRY_TARGETS[key]
-    if level < 10 or level == 28:
+    if level <= 7:
         return 0
-    if level <= 26:
+    if level <= 12:
         return 1
-    if level == 27:
+    if level <= 18:
         return 2
-    if level <= 32:
-        return 1
-    if level <= 34:
+    if level <= 24:
         return 2
-    return 3
+    if level <= 30:
+        return 2
+    if level <= 36:
+        return 3
+    return 4
 
 
 def merge_carry_spools(
@@ -344,12 +324,6 @@ def build_spool_plan(pattern: list[str], level: int, key: str | None = None) -> 
             break
         except ValueError:
             continue
-
-    sample_target = DIFFICULTY_V2_SAMPLES.get(level)
-    if sample_target is not None and applied_carry < sample_target:
-        raise ValueError(f"level {level} only supports {applied_carry} carry reels, needs {sample_target}")
-    if key in CHALLENGE_CARRY_TARGETS and applied_carry < carry_target:
-        raise ValueError(f"candidate {key} only supports {applied_carry} carry reels, needs {carry_target}")
 
     columns: list[list[tuple[str, int]]] = [[], [], [], []]
     solution: list[int] = []
@@ -1018,13 +992,13 @@ def main() -> None:
         tile = tile_crop(image, columns, rows, tile_index)
         source_tiles[key] = tile
         codes = classify_pixels(tile)
+        if not filename.startswith("chapter-seven"):
+            codes[codes == ord("C")] = ord("B")
         pattern, swatches, origin = extract_native_grid(tile, codes, pitch)
         remove_separator_artifacts(pattern)
         pattern = retain_closed_main_figure(pattern)
         pattern, swatches, trim_row, trim_col = trim_parallel(pattern, swatches)
         recolor_cells: set[tuple[int, int]] = set()
-        if key in CHALLENGE_SHELLS:
-            recolor_cells = enforce_runtime_shell(pattern, CHALLENGE_SHELLS[key], layers=3)
         origin = (origin[0] + trim_row * pitch, origin[1] + trim_col * pitch)
         validate_no_enclaves(pattern, key)
         source_patterns[key] = ["".join(row) for row in pattern]
@@ -1039,17 +1013,38 @@ def main() -> None:
             source_palettes[key],
         )
 
-    base_items = [item for item in source_patterns.items() if item[0] not in CHALLENGE_CARRY_TARGETS]
-    ordered = sorted(
-        base_items,
-        key=lambda item: (
-            pattern_metrics(item[1])[0],
-            -pattern_metrics(item[1])[1],
-            pattern_metrics(item[1])[2],
-            pattern_metrics(item[1])[3],
-        ),
-    )
-    ordered.extend((key, source_patterns[key]) for key in CHALLENGE_ORDER)
+    def difficulty_order(keys: tuple[str, ...]) -> list[tuple[str, list[str]]]:
+        return sorted(
+            ((key, source_patterns[key]) for key in keys),
+            key=lambda item: (
+                -pattern_metrics(item[1])[1],
+                pattern_metrics(item[1])[2],
+                pattern_metrics(item[1])[3],
+            ),
+        )
+
+    ordered = [(key, source_patterns[key]) for key in EARLY_ORDER]
+    ordered.extend(difficulty_order(SIX_COLOR_KEYS))
+    ordered.extend(difficulty_order(SEVEN_COLOR_KEYS))
+    if len(ordered) != len(SOURCES):
+        raise ValueError(f"expected {len(SOURCES)} selected patterns, found {len(ordered)}")
+    for level, (key, pattern) in enumerate(ordered, start=1):
+        actual_colors = pattern_metrics(pattern)[0]
+        early_color_contract = {
+            "ladybug": 2,
+            "spellbook": 3,
+            "slime": 3,
+            "suitcase": 4,
+            "potion": 5,
+            "lighthouse": 5,
+            "alteruBloom": 5,
+        }
+        expected_colors = early_color_contract.get(key, 6 if key in SIX_COLOR_KEYS else 7)
+        if actual_colors != expected_colors:
+            actual_codes = sorted({code for row in pattern for code in row if code != "."})
+            raise ValueError(
+                f"level {level} {key}: expected {expected_colors} gameplay colors, found {actual_colors} ({actual_codes})"
+            )
     patterns = {level: pattern for level, (_, pattern) in enumerate(ordered, start=1)}
     cropped_tiles = {level: source_tiles[key] for level, (key, _) in enumerate(ordered, start=1)}
     ordered_palettes = {level: source_palettes[key] for level, (key, _) in enumerate(ordered, start=1)}
@@ -1074,7 +1069,7 @@ def main() -> None:
     order_lines = [
         "# Generated level order",
         "",
-        "Primary sort is actual color count. Within a color chapter, more initially exposed colors come first (more legal choices), then color transitions and stitch count rise.",
+        "Levels 1–7 are the user-selected onboarding set. Six- and seven-color chapters are ordered from more initially exposed colors and lower topology complexity toward denser, less obvious peel structures.",
         "",
         "| Level | Pattern | Colors | Exposed | Transitions | Stitches |",
         "| ---: | --- | ---: | ---: | ---: | ---: |",

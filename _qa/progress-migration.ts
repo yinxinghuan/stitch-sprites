@@ -23,38 +23,40 @@ const legacy = normalizeProgress({
 
 if (!legacy) throw new Error('Version 2 progress was rejected instead of migrated')
 if (legacy.version !== PROGRESS_VERSION) throw new Error(`Expected version ${PROGRESS_VERSION}, got ${legacy.version}`)
-if (legacy.unlockedLevel !== 27 || legacy.bestByLevel['27'] !== 2100) throw new Error('Long-term progress was not preserved')
+if (legacy.unlockedLevel !== 8 || legacy.bestByLevel['7'] !== 1600) throw new Error('Selected legacy progress was not remapped')
+if (legacy.bestByLevel['1']) throw new Error('A removed legacy level leaked into the new collection')
 if (legacy.currentRun !== null) throw new Error('Old in-progress layout survived the difficulty migration')
 if (legacy.economy?.coins !== 45 || legacy.economy.speedTier !== 2) throw new Error('Forward-compatible economy data was lost')
 
-const formerFinale = normalizeProgress({
-  version: PROGRESS_VERSION,
+const versionThree = normalizeProgress({
+  version: 3,
   updatedAt: 2345,
-  unlockedLevel: 35,
-  bestByLevel: { 35: 2125 },
+  unlockedLevel: 20,
+  bestByLevel: { 2: 1550, 20: 2050 },
   currentRun: null,
 })
 
-if (!formerFinale || formerFinale.unlockedLevel !== 36) {
-  throw new Error('A player who completed the former level 35 finale did not unlock level 36')
+if (!versionThree || versionThree.unlockedLevel !== 7 || versionThree.bestByLevel['1'] !== 1525 || versionThree.bestByLevel['6'] !== 1700) {
+  throw new Error('Version 3 selected levels were not remapped to the compact collection')
 }
 
-const merelyUnlockedFinale = normalizeProgress({
+const current = normalizeProgress({
   version: PROGRESS_VERSION,
   updatedAt: 3456,
-  unlockedLevel: 35,
-  bestByLevel: {},
+  unlockedLevel: 31,
+  bestByLevel: { 31: 2025 },
   currentRun: null,
 })
 
-if (!merelyUnlockedFinale || merelyUnlockedFinale.unlockedLevel !== 35) {
-  throw new Error('A player who only unlocked level 35 incorrectly skipped to level 36')
+if (!current || current.unlockedLevel !== 31 || current.bestByLevel['31'] !== 2025) {
+  throw new Error('Current-version progress changed during normalization')
 }
 
 console.log(JSON.stringify({
   ok: true,
   version: legacy.version,
   unlockedLevel: legacy.unlockedLevel,
-  formerFinaleUnlockedLevel: formerFinale.unlockedLevel,
+  versionThreeUnlockedLevel: versionThree.unlockedLevel,
+  currentUnlockedLevel: current.unlockedLevel,
   currentRun: legacy.currentRun,
 }))

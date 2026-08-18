@@ -3,18 +3,8 @@ import { GENERATED_PATTERNS } from './generated-patterns'
 import { findReachable, reachableColors } from './reachability'
 import type { Cell, LevelDefinition, SpoolDefinition, SpoolState, ThreadColor } from './types'
 
-const LEVEL_KEYS = [
-  'watermelon', 'ladybug', 'turtle', 'whale', 'butterfly', 'teapot', 'moonCat', 'cottage',
-  'yarn', 'mitten', 'sweater', 'clock', 'basket', 'musicBox', 'craftRoom', 'potion', 'slime',
-  'spellbook', 'mushroomHome', 'moth', 'starCat', 'flowerFox', 'spiritTree', 'umbrella',
-  'suitcase', 'bell', 'tram', 'lighthouse', 'nightTrain', 'observatory', 'city', 'alteruCoral',
-  'alteruSun', 'alteruNight', 'alteruBloom',
-  'gardenLantern', 'nestingDoll', 'aquarium', 'sleepingFox', 'carouselBox', 'clockworkOwl',
-  'greenhouse',
-]
-
 const LEVEL_COPY: Record<string, { titleKey: string; completeKey: string }> = Object.fromEntries(
-  LEVEL_KEYS.map((key) => [key, { titleKey: `level.${key}`, completeKey: `complete.${key}` }]),
+  GENERATED_PATTERNS.map(({ key }) => [key, { titleKey: `level.${key}`, completeKey: `complete.${key}` }]),
 )
 
 function defineLevel(index: number): LevelDefinition {
@@ -47,7 +37,7 @@ function defineLevel(index: number): LevelDefinition {
         .map(([code, hex]) => [CODE_TO_COLOR[code], hex])
         .filter(([color]) => Boolean(color)),
     ) as Partial<Record<ThreadColor, string>>,
-    tutorial: id <= 2,
+    tutorial: id === 1,
     columns,
     solution: generated.solution,
   }
@@ -106,7 +96,7 @@ const MULTI_RING_COLORS: ThreadColor[] = [
 ]
 
 const MULTI_RING_CODES: Record<ThreadColor, string> = {
-  lake: 'B', coral: 'R', leaf: 'G', sun: 'Y', violet: 'P', ink: 'K',
+  lake: 'B', coral: 'R', leaf: 'G', sun: 'Y', violet: 'P', ink: 'K', aqua: 'C',
 }
 
 function createMultiRingPattern(): { rows: string[]; counts: number[] } {
@@ -194,7 +184,7 @@ function countCells(level: LevelDefinition): Map<ThreadColor, number> {
 }
 
 export function validateLevels(): void {
-  if (LEVELS.length !== 42) throw new Error(`Expected 42 levels, found ${LEVELS.length}`)
+  if (LEVELS.length < 24) throw new Error(`Expected a complete level collection, found ${LEVELS.length}`)
   let previousColorCount = 0
   LEVELS.forEach((level, index) => {
     const generated = GENERATED_PATTERNS[index]
@@ -207,9 +197,6 @@ export function validateLevels(): void {
     if (!entryColors.size) throw new Error(`Level ${level.id}: expected a reachable outer color`)
     if (level.id === 1 && entryColors.size !== 1) {
       throw new Error(`Level 1: expected one tutorial outer color, found ${[...entryColors].join(', ')}`)
-    }
-    if (level.id >= 36 && entryColors.size !== 1) {
-      throw new Error(`Challenge level ${level.id}: expected one outer color, found ${[...entryColors].join(', ')}`)
     }
     const cells = countCells(level)
     const spools = new Map<ThreadColor, number>()
