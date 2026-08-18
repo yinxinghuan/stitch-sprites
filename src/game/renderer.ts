@@ -122,7 +122,7 @@ export class BoardRenderer {
     const waveStartedAt = performance.now()
     const prepared = tasks.map((task) => ({
       task,
-      returnMs: Math.max(360, task.travelMs * (0.62 + (task.workerIndex % 3) * 0.018)),
+      returnMs: Math.max(440, task.travelMs * (0.7 + (task.workerIndex % 3) * 0.018)),
     }))
     const waveSpriteEnd = Math.max(...prepared.map(({ task, returnMs }) => (
       task.departMs + task.travelMs + CONTACT_MS + returnMs + PORTAL_DROP_MS
@@ -134,9 +134,9 @@ export class BoardRenderer {
         returnMs,
         threadDelayMs: Math.max(
           0,
-          waveSpriteEnd + 140 + task.workerIndex * 74 - task.departMs - task.travelMs - CONTACT_MS,
+          waveSpriteEnd + 230 + task.workerIndex * 96 - task.departMs - task.travelMs - CONTACT_MS,
         ),
-        threadRecoveryMs: 820 + ((task.workerIndex * 7 + task.row * 3 + task.col) % 5) * 72,
+        threadRecoveryMs: 1160 + ((task.workerIndex * 7 + task.row * 3 + task.col) % 5) * 86,
       })
     })
     this.requestDraw()
@@ -617,7 +617,7 @@ export class BoardRenderer {
       const gait = elapsed / (108 + mission.workerIndex % 4 * 8) + mission.workerIndex * 0.73
       ctx.save()
       const sizeVariation = 0.92 + ((mission.workerIndex * 7) % 5) * 0.04
-      const radius = Math.max(7.3, geo.cellSize * 1.42 * sizeVariation)
+      const radius = Math.max(8.6, geo.cellSize * 1.58 * sizeVariation)
       const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
       const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
       const targetY = geo.top + (mission.row + 0.5) * geo.cellSize
@@ -770,8 +770,8 @@ export class BoardRenderer {
     const previous = bezierPoint(Math.max(0, eased - 0.025))
     const direction = Math.atan2(point.y - previous.y, point.x - previous.x)
     const drop = Math.max(0, (progress - 0.82) / 0.18)
-    const strandLength = radius * (2.05 - drop * 1.25)
-    const sway = this.reducedMotion ? 0 : Math.sin(progress * Math.PI * 12 + workerIndex) * radius * 0.32 * (1 - drop)
+    const strandLength = radius * (3.2 - drop * 1.55)
+    const sway = this.reducedMotion ? 0 : Math.sin(progress * Math.PI * 10 + workerIndex) * radius * 0.42 * (1 - drop)
     ctx.save()
     ctx.translate(point.x, point.y + drop * radius * 0.9)
     ctx.rotate(direction)

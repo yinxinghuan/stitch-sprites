@@ -9,7 +9,12 @@ interface EngineHooks {
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms))
-const RELEASE_MS = 130
+// The first pace tier is deliberately readable. Later progression can reduce
+// these values without having to speed up the renderer as a whole.
+const RELEASE_MS = 170
+const BASE_TRAVEL_MIN_MS = 560
+const BASE_TRAVEL_MAX_MS = 1180
+const BASE_QUEUE_INTERVAL_MS = 190
 
 export class GameEngine {
   readonly audio = new GameAudio()
@@ -156,10 +161,13 @@ export class GameEngine {
           if (!path.length) break
           foundTarget = true
           reserved.add(`${target.row}:${target.col}`)
-          const paceVariation = ((workerIndex * 17 + target.row * 3 + target.col) % 7 - 3) * 14
-          const travelMs = Math.max(430, Math.min(920, 270 + path.length * 18 + paceVariation))
-          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 8
-          const departMs = workerIndex * 132 + queueJitter
+          const paceVariation = ((workerIndex * 17 + target.row * 3 + target.col) % 7 - 3) * 18
+          const travelMs = Math.max(
+            BASE_TRAVEL_MIN_MS,
+            Math.min(BASE_TRAVEL_MAX_MS, 350 + path.length * 24 + paceVariation),
+          )
+          const queueJitter = ((target.row * 5 + target.col + workerIndex * 3) % 4) * 10
+          const departMs = workerIndex * BASE_QUEUE_INTERVAL_MS + queueJitter
           tasks.push({
             slotId: slot.slotId,
             color: slot.spool.color,
