@@ -26,6 +26,7 @@ export interface LevelDefinition {
   solution: number[]
   tutorial: boolean
   displayPalette: Partial<Record<ThreadColor, string>>
+  textureMode?: 'source' | 'procedural'
 }
 
 export interface ActiveSlot {

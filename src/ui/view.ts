@@ -37,7 +37,11 @@ export class GameView {
   private galleryRenderedUnlocked = -1
   private leaderboardOpen = false
   private leaderboardRows: LeaderboardEntry[] = []
-  constructor(root: HTMLElement, private readonly leaderboard: LeaderboardService | null) {
+  constructor(
+    root: HTMLElement,
+    private readonly leaderboard: LeaderboardService | null,
+    private readonly labMode = false,
+  ) {
     root.innerHTML = `
       <div class="ss-app">
         <header class="ss-header">
@@ -247,14 +251,15 @@ export class GameView {
             <span class="ss-result__eyebrow">${t('complete.title')}</span>
             <p>${t('complete.reveal')}</p>
             <h2>${t(snapshot.level.completeKey)}</h2>
-            <small class="ss-result__mastery">${t('complete.score', { n: snapshot.levelScore })} · ${t('complete.totalScore', { n: snapshot.totalMastery })}</small>
+            ${this.labMode ? '' : `<small class="ss-result__mastery">${t('complete.score', { n: snapshot.levelScore })} · ${t('complete.totalScore', { n: snapshot.totalMastery })}</small>`}
           </div>
-          <button class="ss-primary" type="button">${snapshot.level.id < LEVELS.length ? t('action.next') : t('action.gallery')} ${snapshot.level.id < LEVELS.length ? arrowIcon : galleryIcon}</button>
+          <button class="ss-primary" type="button">${this.labMode ? t('action.again') : (snapshot.level.id < LEVELS.length ? t('action.next') : t('action.gallery'))} ${this.labMode ? restartIcon : (snapshot.level.id < LEVELS.length ? arrowIcon : galleryIcon)}</button>
         </div>
       `
       this.paintPatternCanvases()
       this.overlay.querySelector('button')?.addEventListener('click', () => {
-        if (snapshot.level.id < LEVELS.length) engine.next()
+        if (this.labMode) engine.restart()
+        else if (snapshot.level.id < LEVELS.length) engine.next()
         else {
           this.galleryOpen = true
           this.renderGallery(engine)
@@ -397,15 +402,17 @@ export class GameView {
     const cell = Math.min((size - padding * 2) / patternCols, (size - padding * 2) / patternRows)
     const left = (size - patternCols * cell) / 2
     const top = (size - patternRows * cell) / 2
-    const texture = new Image()
-    texture.decoding = 'async'
-    texture.onload = () => {
-      ctx.clearRect(0, 0, size, size)
-      ctx.fillStyle = '#fbf3e2'
-      ctx.fillRect(0, 0, size, size)
-      ctx.drawImage(texture, left, top, patternCols * cell, patternRows * cell)
+    if (level.textureMode !== 'procedural') {
+      const texture = new Image()
+      texture.decoding = 'async'
+      texture.onload = () => {
+        ctx.clearRect(0, 0, size, size)
+        ctx.fillStyle = '#fbf3e2'
+        ctx.fillRect(0, 0, size, size)
+        ctx.drawImage(texture, left, top, patternCols * cell, patternRows * cell)
+      }
+      texture.src = new URL(`./patterns/${level.reveal}.png`, document.baseURI).href
     }
-    texture.src = new URL(`./patterns/${level.reveal}.png`, document.baseURI).href
     ctx.lineCap = 'round'
     level.rows.forEach((row, rowIndex) => [...row].forEach((code, colIndex) => {
       if (code === '.') return

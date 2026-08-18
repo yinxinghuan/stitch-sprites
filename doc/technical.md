@@ -20,7 +20,7 @@ src/
   game/
     engine.ts                    权威状态、选牌、批次工作、完成/失败/存档
     progress.ts                  稳定节点存档 schema、本地仓库、合并与绣艺分
-    levels.ts                    把离线数据组装为 42 个 LevelDefinition
+    levels.ts                    组装正式 42 关，并保存隔离的双入口实验关
     generated-patterns.ts        生成的网格、逐关调色板、四列线轴与解法
     reachability.ts              外部洪泛、可达颜色、目标与步行路径
     renderer.ts                  Canvas 静态缓存、源纹理遮罩、精灵与线束动画
@@ -46,6 +46,8 @@ doc/references/
   generated-pattern-order.md     当前颜色/复杂度排序证据
 _qa/
   solve-levels.ts                42 关解法与失败路径回放
+  dual-entry-lab.ts              双入口、双可恢复路线与槽位差异门禁
+  capture-dual-entry-lab.mjs     实验关双尺寸、压力态与结算截图
   progress-migration.ts          v2 存档到 v3 牌序迁移回归
   feature-regression.mjs         首动风险、稳定存档、可选榜单与双击缩放回归
   capture-levels.mjs             全关截图、溢出和卡牌均衡检查
@@ -84,6 +86,8 @@ _qa/
 
 第 1 关只在第一次输入强制正确列；第一次真实拆线后，所有关卡都允许错误颜色进入等待轴位。第 1–2 关首次五槽堵塞会展示 650ms 后自动退回最后一卷，第 3 关起进入真实失败。
 
+`DUAL_ENTRY_LAB_LEVEL` 是不属于正式关卡生成流水线的机制探针。只有 URL 同时包含 `lab=dual-entry` 与 `level=42` 时，`main.ts` 才在完成正式关卡验证后临时把运行时第 42 关替换为实验关。实验关不加载高清纹理，直接使用逻辑针点；显式关卡查询使引擎不读取/写入中途局，入口同时关闭远程合并、排行榜展示与提交。两个外露入口都可立即拆线并最终通关，但权威回放固定验证低压力路线峰值等待 0、高压力路线峰值等待 2，避免把假选择或死路误当成路线决策。
+
 `progress.ts` 以版本化 `PersistedProgress` 保存最高解锁关、逐关最佳绣艺分和当前稳定关卡状态。引擎只在关卡载入或整批任务结算后写入，保存已拆格索引、四列、五槽和本局决策统计；动画中途关闭会回到上一稳定节点。难度 v2 把 schema 升到版本 3：读取 v2 时保留已解锁关、最佳分和预留经济字段，但清空与旧牌序不兼容的 `currentRun`。追加 36–42 关不再改变 schema：只有最高解锁为 35 且已存在第 35 关最好成绩的旧终章完成者迁移到解锁 36，仅解锁未完成者仍停在 35。`alteruLocalStorage` 负责同部署 UUID 的本地隔离；平台适配器存在时以 1 秒防抖同步相同 JSON 到 Aigram 云存档。云数据只在本次尚无玩家操作时接管当前局，本地与云端的解锁关和逐关最好分始终取并集/最大值。
 
 绣艺分不使用时间：单关为 `1000 + levelId × 25 + 零错误奖励 250 + 无帮助奖励 250`，每关只保留最好一次，总分为逐关最好分之和。这样金币、广告和未来速度升级不会改变排行榜公平性。
@@ -110,6 +114,7 @@ _qa/
 
 - **新增/替换图案**：把素材页放入 `doc/references/`，更新生成脚本 `SOURCES`，运行生成器；不要手改 `generated-patterns.ts` 或 `public/patterns/`。
 - **调整难度排序与每关选择数**：修改生成脚本的同章排序键、`target_selections()`、`requested_carry_reels()`、`CHALLENGE_CARRY_TARGETS` 或 `RUN_COLUMN_PAIRS`，重新生成并跑全关解法、五步失败路径和 v2 存档迁移。
+- **调整双入口实验**：只修改 `levels.ts` 的 `DUAL_ENTRY_LAB_LEVEL` 与 `_qa/dual-entry-lab.ts` 的两条权威路线；正式 `GENERATED_PATTERNS`、42 关编号和线上进度不得随实验变化。
 - **修改可达/失败规则**：编辑 `reachability.ts` 与 `engine.ts`，同步更新生成器中的离线洪泛合同。
 - **调整颜色和符号**：编辑 `palette.ts`；逐关源色仍由生成器输出。
 - **调整精灵、拆线或回收演出**：编辑 `renderer.ts` 的任务时间与绘制函数；必须复验行走、异步回收和最密关性能。

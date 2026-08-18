@@ -424,7 +424,9 @@ export class BoardRenderer {
 
   private drawStitches(ctx: CanvasRenderingContext2D, geo: BoardGeometry): void {
     if (!this.snapshot) return
-    const texture = this.patternTexture(this.snapshot.level.reveal)
+    const texture = this.snapshot.level.textureMode === 'procedural'
+      ? null
+      : this.patternTexture(this.snapshot.level.reveal)
     if (texture) {
       const visible = new Path2D()
       this.snapshot.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
