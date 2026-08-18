@@ -31,8 +31,12 @@ async function capture(viewport, unlocked) {
       const rect = button.getBoundingClientRect()
       return rect.width < 44 || rect.height < 44
     }).length,
+    unclippedThumbnails: [...document.querySelectorAll('.ss-gallery-card:not(:disabled) .ss-pattern-thumb')].filter((canvas) => {
+      const style = getComputedStyle(canvas)
+      return style.borderRadius !== '50%' || !style.clipPath.includes('circle')
+    }).length,
   }))
-  if (result.cards !== 35 || result.enabled !== unlocked || result.scrollWidth > result.width || result.undersized) {
+  if (result.cards !== 35 || result.enabled !== unlocked || result.scrollWidth > result.width || result.undersized || result.unclippedThumbnails) {
     throw new Error(`Gallery contract failed: ${JSON.stringify(result)}`)
   }
   await page.screenshot({ path: path.join(outputDir, `${pass}-unlocked${unlocked}-${viewport.width}x${viewport.height}.png`) })

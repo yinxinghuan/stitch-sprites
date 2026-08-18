@@ -77,7 +77,32 @@ if (!externalOnly) {
   await selectPath(page, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
   await page.waitForTimeout(100)
   if (!await page.locator('.ss-result--complete').count()) throw new Error('Level 1 correct path did not complete')
+  const resultThumb = await page.locator('.ss-pattern-thumb--result').evaluate((canvas) => {
+    const style = getComputedStyle(canvas)
+    const frame = canvas.closest('.ss-result__badge')
+    return { borderRadius: style.borderRadius, clipPath: style.clipPath, frameOverflow: frame ? getComputedStyle(frame).overflow : '' }
+  })
+  if (resultThumb.borderRadius !== '50%' || !resultThumb.clipPath.includes('circle') || resultThumb.frameOverflow !== 'hidden') {
+    throw new Error(`Result thumbnail is not clipped into its round frame: ${JSON.stringify(resultThumb)}`)
+  }
   await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level1-complete-390x844.png`) })
+  await context.close()
+}
+
+{
+  const { context, page } = await open({ width: 320, height: 568 }, 1, true, true)
+  await selectPath(page, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+  await page.waitForTimeout(100)
+  if (!await page.locator('.ss-result--complete').count()) throw new Error('Narrow level 1 correct path did not complete')
+  const narrowResultThumb = await page.locator('.ss-pattern-thumb--result').evaluate((canvas) => {
+    const style = getComputedStyle(canvas)
+    const frame = canvas.closest('.ss-result__badge')
+    return { borderRadius: style.borderRadius, clipPath: style.clipPath, frameOverflow: frame ? getComputedStyle(frame).overflow : '' }
+  })
+  if (narrowResultThumb.borderRadius !== '50%' || !narrowResultThumb.clipPath.includes('circle') || narrowResultThumb.frameOverflow !== 'hidden') {
+    throw new Error(`Narrow result thumbnail is not clipped into its round frame: ${JSON.stringify(narrowResultThumb)}`)
+  }
+  await page.screenshot({ path: path.join(root, `${pass}-platform-layout-level1-complete-320x568.png`) })
   await context.close()
 }
 
