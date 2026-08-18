@@ -99,6 +99,44 @@ export const DUAL_ENTRY_LAB_LEVEL: LevelDefinition = {
   solution: [0, 1, 3, 2, 3, 3],
 }
 
+const MULTI_RING_COLORS: ThreadColor[] = [
+  'lake', 'coral', 'leaf', 'sun', 'violet', 'ink',
+  'coral', 'violet', 'lake', 'ink', 'sun', 'leaf',
+  'sun', 'lake', 'ink', 'leaf', 'coral', 'violet',
+]
+
+const MULTI_RING_CODES: Record<ThreadColor, string> = {
+  lake: 'B', coral: 'R', leaf: 'G', sun: 'Y', violet: 'P', ink: 'K',
+}
+
+function createMultiRingPattern(): { rows: string[]; counts: number[] } {
+  const size = 73
+  const center = (size - 1) / 2
+  const radius = center - 0.5
+  const ringWidth = radius / MULTI_RING_COLORS.length
+  const counts = MULTI_RING_COLORS.map(() => 0)
+  const rows = Array.from({ length: size }, (_, row) => (
+    Array.from({ length: size }, (_, col) => {
+      const distance = Math.hypot(row - center, col - center)
+      if (distance > radius) return '.'
+      const ringIndex = Math.min(
+        MULTI_RING_COLORS.length - 1,
+        Math.floor((radius - distance) / ringWidth),
+      )
+      counts[ringIndex] += 1
+      return MULTI_RING_CODES[MULTI_RING_COLORS[ringIndex]]
+    }).join('')
+  ))
+  return { rows, counts }
+}
+
+const MULTI_RING_PATTERN = createMultiRingPattern()
+const multiRingSpool = (ringIndex: number): SpoolDefinition => ({
+  id: `ring-${String(ringIndex + 1).padStart(2, '0')}-${MULTI_RING_COLORS[ringIndex]}`,
+  color: MULTI_RING_COLORS[ringIndex],
+  capacity: MULTI_RING_PATTERN.counts[ringIndex],
+})
+
 export const MULTI_RING_LAB_LEVEL: LevelDefinition = {
   id: 42,
   titleKey: 'level.multiRingLab',
@@ -111,70 +149,14 @@ export const MULTI_RING_LAB_LEVEL: LevelDefinition = {
     lake: '#3e9bd3', coral: '#ed5b67', leaf: '#55ad6e',
     sun: '#f3bf3f', violet: '#9473c8', ink: '#353541',
   },
-  rows: [
-    '.................................................',
-    '........................R........................',
-    '..................BBBBBBRRRRRRR..................',
-    '...............BBBBBBBBBRRRRRRRRRR...............',
-    '.............BBBBBBBBBBBRRRRRRRRRRRR.............',
-    '............BBBBBBBBBBBBRRRRRRRRRRRRR............',
-    '..........BBBBBBBBBBBBBBRRRRRRRRRRRRRRR..........',
-    '.........BBBBBBBBBBBPPPPPPPPPRRRRRRRRRRR.........',
-    '........BBBBBBBBBPPPPPPPPPPPPPPPRRRRRRRRR........',
-    '.......BBBBBBBBPPPPPPPPPPPPPPPPPPPRRRRRRRR.......',
-    '......BBBBBBBBPPPPPPPPPPPPPPPPPPPPPRRRRRRRR......',
-    '......BBBBBBBPPPPPPPPPPPPPPPPPPPPPPPRRRRRRR......',
-    '.....BBBBBBBPPPPPPPPPPBBRRRPPPPPPPPPPRRRRRRR.....',
-    '....BBBBBBBPPPPPPPPBBBBBRRRRRRPPPPPPPPRRRRRRR....',
-    '....BBBBBBPPPPPPPBBBBBBBRRRRRRRRPPPPPPPRRRRRR....',
-    '...BBBBBBPPPPPPPBBBBBBBBRRRRRRRRRPPPPPPPRRRRRR...',
-    '...BBBBBBPPPPPPBBBBBBBBBRRRRRRRRRRPPPPPPRRRRRR...',
-    '...BBBBBPPPPPPBBBBBBBBBBRRRRRRRRRRRPPPPPPRRRRR...',
-    '..BBBBBBPPPPPPBBBBBBBBBBRRRRRRRRRRRPPPPPPRRRRRR..',
-    '..BBBBBBPPPPPBBBBBBBBBBKKKRRRRRRRRRRPPPPPRRRRRR..',
-    '..BBBBBPPPPPPBBBBBBBBKKKKKKKRRRRRRRRPPPPPPRRRRR..',
-    '..BBBBBPPPPPPBBBBBBBKKKKKKKKKRRRRRRRPPPPPPRRRRR..',
-    '..BBBBBPPPPPBBBBBBBBKKKKKKKKKRRRRRRRRPPPPPRRRRR..',
-    '..BBBBBPPPPPBBBBBBBKKKKKKKKKKKRRRRRRRPPPPPRRRRR..',
-    '.GGGGGGPPPPPGGGGGGGKKKKKKKKKKKYYYYYYYPPPPPYYYYYY.',
-    '..GGGGGPPPPPGGGGGGGKKKKKKKKKKKYYYYYYYPPPPPYYYYY..',
-    '..GGGGGPPPPPGGGGGGGGKKKKKKKKKYYYYYYYYPPPPPYYYYY..',
-    '..GGGGGPPPPPPGGGGGGGKKKKKKKKKYYYYYYYPPPPPPYYYYY..',
-    '..GGGGGPPPPPPGGGGGGGGKKKKKKKYYYYYYYYPPPPPPYYYYY..',
-    '..GGGGGGPPPPPGGGGGGGGGGKKKYYYYYYYYYYPPPPPYYYYYY..',
-    '..GGGGGGPPPPPPGGGGGGGGGGYYYYYYYYYYYPPPPPPYYYYYY..',
-    '...GGGGGPPPPPPGGGGGGGGGGYYYYYYYYYYYPPPPPPYYYYY...',
-    '...GGGGGGPPPPPPGGGGGGGGGYYYYYYYYYYPPPPPPYYYYYY...',
-    '...GGGGGGPPPPPPPGGGGGGGGYYYYYYYYYPPPPPPPYYYYYY...',
-    '....GGGGGGPPPPPPPGGGGGGGYYYYYYYYPPPPPPPYYYYYY....',
-    '....GGGGGGGPPPPPPPPGGGGGYYYYYYPPPPPPPPYYYYYYY....',
-    '.....GGGGGGGPPPPPPPPPPGGYYYPPPPPPPPPPYYYYYYY.....',
-    '......GGGGGGGPPPPPPPPPPPPPPPPPPPPPPPYYYYYYY......',
-    '......GGGGGGGGPPPPPPPPPPPPPPPPPPPPPYYYYYYYY......',
-    '.......GGGGGGGGPPPPPPPPPPPPPPPPPPPYYYYYYYY.......',
-    '........GGGGGGGGGPPPPPPPPPPPPPPPYYYYYYYYY........',
-    '.........GGGGGGGGGGGPPPPPPPPPYYYYYYYYYYY.........',
-    '..........GGGGGGGGGGGGGGYYYYYYYYYYYYYYY..........',
-    '............GGGGGGGGGGGGYYYYYYYYYYYYY............',
-    '.............GGGGGGGGGGGYYYYYYYYYYYY.............',
-    '...............GGGGGGGGGYYYYYYYYYY...............',
-    '..................GGGGGGYYYYYYY..................',
-    '........................Y........................',
-    '.................................................',
-  ],
+  rows: MULTI_RING_PATTERN.rows,
   columns: [
-    [
-      { id: 'ring-lake-carry', color: 'lake', capacity: 255 },
-      { id: 'ring-violet-gate', color: 'violet', capacity: 492 },
-    ],
-    [
-      { id: 'ring-coral-carry', color: 'coral', capacity: 268 },
-      { id: 'ring-ink-core', color: 'ink', capacity: 89 },
-    ],
-    [{ id: 'ring-leaf-carry', color: 'leaf', capacity: 268 }],
-    [{ id: 'ring-sun-carry', color: 'sun', capacity: 281 }],
+    [0, 4].map(multiRingSpool),
+    [1, 5, 10, 6, 16, 12].map(multiRingSpool),
+    [2, 9, 7, 17, 13].map(multiRingSpool),
+    [3, 11, 8, 15, 14].map(multiRingSpool),
   ],
-  solution: [0, 0, 1, 2, 3, 1],
+  solution: [0, 1, 2, 3, 0, 1, 1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3],
 }
 
 export function activateDualEntryLab(): void {
@@ -265,9 +247,8 @@ export function validateMultiRingLab(): void {
   const level = MULTI_RING_LAB_LEVEL
   const initialCells = createCells(level)
   const entryColors = reachableColors(initialCells, findReachable(initialCells))
-  const expected = new Set<ThreadColor>(['lake', 'coral', 'leaf', 'sun'])
-  if (entryColors.size !== expected.size || [...expected].some((color) => !entryColors.has(color))) {
-    throw new Error(`Multi-ring lab: expected four outer colors, found ${[...entryColors].join(', ')}`)
+  if (entryColors.size !== 1 || !entryColors.has('lake')) {
+    throw new Error(`Multi-ring lab: expected a lake outer ring, found ${[...entryColors].join(', ')}`)
   }
   const cells = countCells(level)
   const spools = new Map<ThreadColor, number>()

@@ -76,13 +76,12 @@ function run(path: number[]) {
 }
 
 validateMultiRingLab()
-const safe = run([0, 0, 1, 2, 3, 1])
-const prematureCore = run([0, 1, 1, 2, 3])
+const safe = run(MULTI_RING_LAB_LEVEL.solution)
+const visibleFailure = run([0, 1, 2, 3, 0, 1, 2, 3, 2, 3, 2])
 
 if (!safe.complete || safe.failedAt) throw new Error(`Safe route failed: ${JSON.stringify(safe)}`)
-if (prematureCore.failedAt !== 5) throw new Error(`Premature core route should fail on selection 5: ${JSON.stringify(prematureCore)}`)
-if (prematureCore.reachable.join(',') !== 'violet') {
-  throw new Error(`Failure should visibly require the violet gate: ${JSON.stringify(prematureCore)}`)
+if (visibleFailure.failedAt !== 11 || visibleFailure.reachable.join(',') !== 'coral') {
+  throw new Error(`Visible-choice failure did not reproduce: ${JSON.stringify(visibleFailure)}`)
 }
 
-console.log(JSON.stringify({ ok: true, safe, prematureCore }))
+console.log(JSON.stringify({ ok: true, safe, visibleFailure }))

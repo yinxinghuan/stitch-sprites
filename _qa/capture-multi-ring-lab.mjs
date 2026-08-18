@@ -47,15 +47,19 @@ async function open(viewport) {
 
 async function capture(viewport) {
   const { context, page, layout } = await open(viewport)
+  const openingCards = await page.locator('.ss-spool').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
+  if (!openingCards[0]?.includes('蓝色')) {
+    throw new Error(`Multi-ring opening must deal the outer lake reel: ${JSON.stringify(openingCards)}`)
+  }
   await page.screenshot({ path: path.join(outputDir, `${pass}-platform-layout-initial-${viewport.width}x${viewport.height}.png`) })
 
-  for (const column of [0, 1, 1, 2, 3]) await clickAndSettle(page, column)
+  for (const column of [0, 1, 2, 3, 0, 1, 2, 3, 2, 3, 2]) await clickAndSettle(page, column)
   await page.locator('.ss-result--failed').waitFor({ state: 'visible', timeout: 30000 })
   const failure = await page.evaluate(() => ({
     waiting: document.querySelectorAll('.ss-slot--waiting').length,
     colors: document.querySelector('.ss-result--failed small')?.textContent,
   }))
-  if (failure.waiting !== 5 || !failure.colors?.includes('紫色')) {
+  if (failure.waiting !== 5 || !failure.colors?.includes('红色')) {
     throw new Error(`Multi-ring failure is not legible: ${JSON.stringify(failure)}`)
   }
   await page.screenshot({ path: path.join(outputDir, `${pass}-platform-layout-failed-${viewport.width}x${viewport.height}.png`) })
@@ -63,9 +67,21 @@ async function capture(viewport) {
   return { viewport, layout, failure }
 }
 
+async function captureComplete(viewport) {
+  const { context, page } = await open(viewport)
+  for (const column of [0, 1, 2, 3, 0, 1, 1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3]) {
+    await clickAndSettle(page, column)
+  }
+  await page.locator('.ss-result--complete').waitFor({ state: 'visible', timeout: 30000 })
+  await page.screenshot({ path: path.join(outputDir, `${pass}-platform-layout-complete-${viewport.width}x${viewport.height}.png`) })
+  await context.close()
+  return { complete: true, viewport }
+}
+
 const results = [
   await capture({ width: 390, height: 844 }),
   await capture({ width: 320, height: 568 }),
 ]
+const completion = await captureComplete({ width: 390, height: 844 })
 await browser.close()
-console.log(JSON.stringify({ ok: true, results }))
+console.log(JSON.stringify({ ok: true, results, completion }))
