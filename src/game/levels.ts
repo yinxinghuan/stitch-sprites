@@ -99,8 +99,90 @@ export const DUAL_ENTRY_LAB_LEVEL: LevelDefinition = {
   solution: [0, 1, 3, 2, 3, 3],
 }
 
+export const MULTI_RING_LAB_LEVEL: LevelDefinition = {
+  id: 42,
+  titleKey: 'level.multiRingLab',
+  completeKey: 'complete.multiRingLab',
+  reveal: 'multi-ring-lab',
+  density: 1,
+  textureMode: 'procedural',
+  tutorial: false,
+  displayPalette: {
+    lake: '#3e9bd3', coral: '#ed5b67', leaf: '#55ad6e',
+    sun: '#f3bf3f', violet: '#9473c8', ink: '#353541',
+  },
+  rows: [
+    '.................................................',
+    '........................R........................',
+    '..................BBBBBBRRRRRRR..................',
+    '...............BBBBBBBBBRRRRRRRRRR...............',
+    '.............BBBBBBBBBBBRRRRRRRRRRRR.............',
+    '............BBBBBBBBBBBBRRRRRRRRRRRRR............',
+    '..........BBBBBBBBBBBBBBRRRRRRRRRRRRRRR..........',
+    '.........BBBBBBBBBBBPPPPPPPPPRRRRRRRRRRR.........',
+    '........BBBBBBBBBPPPPPPPPPPPPPPPRRRRRRRRR........',
+    '.......BBBBBBBBPPPPPPPPPPPPPPPPPPPRRRRRRRR.......',
+    '......BBBBBBBBPPPPPPPPPPPPPPPPPPPPPRRRRRRRR......',
+    '......BBBBBBBPPPPPPPPPPPPPPPPPPPPPPPRRRRRRR......',
+    '.....BBBBBBBPPPPPPPPPPBBRRRPPPPPPPPPPRRRRRRR.....',
+    '....BBBBBBBPPPPPPPPBBBBBRRRRRRPPPPPPPPRRRRRRR....',
+    '....BBBBBBPPPPPPPBBBBBBBRRRRRRRRPPPPPPPRRRRRR....',
+    '...BBBBBBPPPPPPPBBBBBBBBRRRRRRRRRPPPPPPPRRRRRR...',
+    '...BBBBBBPPPPPPBBBBBBBBBRRRRRRRRRRPPPPPPRRRRRR...',
+    '...BBBBBPPPPPPBBBBBBBBBBRRRRRRRRRRRPPPPPPRRRRR...',
+    '..BBBBBBPPPPPPBBBBBBBBBBRRRRRRRRRRRPPPPPPRRRRRR..',
+    '..BBBBBBPPPPPBBBBBBBBBBKKKRRRRRRRRRRPPPPPRRRRRR..',
+    '..BBBBBPPPPPPBBBBBBBBKKKKKKKRRRRRRRRPPPPPPRRRRR..',
+    '..BBBBBPPPPPPBBBBBBBKKKKKKKKKRRRRRRRPPPPPPRRRRR..',
+    '..BBBBBPPPPPBBBBBBBBKKKKKKKKKRRRRRRRRPPPPPRRRRR..',
+    '..BBBBBPPPPPBBBBBBBKKKKKKKKKKKRRRRRRRPPPPPRRRRR..',
+    '.GGGGGGPPPPPGGGGGGGKKKKKKKKKKKYYYYYYYPPPPPYYYYYY.',
+    '..GGGGGPPPPPGGGGGGGKKKKKKKKKKKYYYYYYYPPPPPYYYYY..',
+    '..GGGGGPPPPPGGGGGGGGKKKKKKKKKYYYYYYYYPPPPPYYYYY..',
+    '..GGGGGPPPPPPGGGGGGGKKKKKKKKKYYYYYYYPPPPPPYYYYY..',
+    '..GGGGGPPPPPPGGGGGGGGKKKKKKKYYYYYYYYPPPPPPYYYYY..',
+    '..GGGGGGPPPPPGGGGGGGGGGKKKYYYYYYYYYYPPPPPYYYYYY..',
+    '..GGGGGGPPPPPPGGGGGGGGGGYYYYYYYYYYYPPPPPPYYYYYY..',
+    '...GGGGGPPPPPPGGGGGGGGGGYYYYYYYYYYYPPPPPPYYYYY...',
+    '...GGGGGGPPPPPPGGGGGGGGGYYYYYYYYYYPPPPPPYYYYYY...',
+    '...GGGGGGPPPPPPPGGGGGGGGYYYYYYYYYPPPPPPPYYYYYY...',
+    '....GGGGGGPPPPPPPGGGGGGGYYYYYYYYPPPPPPPYYYYYY....',
+    '....GGGGGGGPPPPPPPPGGGGGYYYYYYPPPPPPPPYYYYYYY....',
+    '.....GGGGGGGPPPPPPPPPPGGYYYPPPPPPPPPPYYYYYYY.....',
+    '......GGGGGGGPPPPPPPPPPPPPPPPPPPPPPPYYYYYYY......',
+    '......GGGGGGGGPPPPPPPPPPPPPPPPPPPPPYYYYYYYY......',
+    '.......GGGGGGGGPPPPPPPPPPPPPPPPPPPYYYYYYYY.......',
+    '........GGGGGGGGGPPPPPPPPPPPPPPPYYYYYYYYY........',
+    '.........GGGGGGGGGGGPPPPPPPPPYYYYYYYYYYY.........',
+    '..........GGGGGGGGGGGGGGYYYYYYYYYYYYYYY..........',
+    '............GGGGGGGGGGGGYYYYYYYYYYYYY............',
+    '.............GGGGGGGGGGGYYYYYYYYYYYY.............',
+    '...............GGGGGGGGGYYYYYYYYYY...............',
+    '..................GGGGGGYYYYYYY..................',
+    '........................Y........................',
+    '.................................................',
+  ],
+  columns: [
+    [
+      { id: 'ring-lake-carry', color: 'lake', capacity: 255 },
+      { id: 'ring-violet-gate', color: 'violet', capacity: 492 },
+    ],
+    [
+      { id: 'ring-coral-carry', color: 'coral', capacity: 268 },
+      { id: 'ring-ink-core', color: 'ink', capacity: 89 },
+    ],
+    [{ id: 'ring-leaf-carry', color: 'leaf', capacity: 268 }],
+    [{ id: 'ring-sun-carry', color: 'sun', capacity: 281 }],
+  ],
+  solution: [0, 0, 1, 2, 3, 1],
+}
+
 export function activateDualEntryLab(): void {
   LEVELS[LEVELS.length - 1] = DUAL_ENTRY_LAB_LEVEL
+}
+
+export function activateMultiRingLab(): void {
+  LEVELS[LEVELS.length - 1] = MULTI_RING_LAB_LEVEL
 }
 
 export function createCells(level: LevelDefinition): Cell[][] {
@@ -175,6 +257,26 @@ export function validateDualEntryLab(): void {
   cells.forEach((count, color) => {
     if (spools.get(color) !== count) {
       throw new Error(`Dual-entry lab: ${color} cells=${count}, spool capacity=${spools.get(color) ?? 0}`)
+    }
+  })
+}
+
+export function validateMultiRingLab(): void {
+  const level = MULTI_RING_LAB_LEVEL
+  const initialCells = createCells(level)
+  const entryColors = reachableColors(initialCells, findReachable(initialCells))
+  const expected = new Set<ThreadColor>(['lake', 'coral', 'leaf', 'sun'])
+  if (entryColors.size !== expected.size || [...expected].some((color) => !entryColors.has(color))) {
+    throw new Error(`Multi-ring lab: expected four outer colors, found ${[...entryColors].join(', ')}`)
+  }
+  const cells = countCells(level)
+  const spools = new Map<ThreadColor, number>()
+  createColumns(level).flat().forEach((spool) => {
+    spools.set(spool.color, (spools.get(spool.color) ?? 0) + spool.capacity)
+  })
+  cells.forEach((count, color) => {
+    if (spools.get(color) !== count) {
+      throw new Error(`Multi-ring lab: ${color} cells=${count}, spool capacity=${spools.get(color) ?? 0}`)
     }
   })
 }
