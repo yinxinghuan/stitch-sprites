@@ -6,6 +6,8 @@ import { t } from '../i18n'
 import type { LeaderboardEntry, LeaderboardService } from '../platform/contracts'
 import { arrowIcon, closeIcon, galleryIcon, lockIcon, rankIcon, restartIcon, soundIcon } from './icons'
 
+const VISIBLE_BACK_CARD_COUNT = 6
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -207,9 +209,9 @@ export class GameView {
     this.tray.innerHTML = snapshot.columns.map((column, index) => {
       const top = column[0]
       const enabled = engine.canSelectColumn(index)
-      const backLayers = column.slice(1, 3).map((spool, depth) => {
+      const backLayers = column.slice(1, VISIBLE_BACK_CARD_COUNT + 1).map((spool, depth) => {
         const thread = resolveThreadStyle(spool.color, snapshot.level.displayPalette)
-        return `<span class="ss-spool-back" style="--depth:${depth + 1};--thread:${thread.hex}"></span>`
+        return `<span class="ss-spool-back" aria-hidden="true" style="--depth:${depth + 1};--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}"></span>`
       }).reverse().join('')
       return `
         <div class="ss-column" aria-label="${t('tray.column', { n: index + 1 })}">

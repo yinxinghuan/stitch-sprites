@@ -46,6 +46,13 @@
 - `topology-challenge-first-pass-level42-320x568.png`：最密关窄屏。
 - 断言：无横向溢出；四张首牌同尺寸。390px 下为 76×80px，320px 下为 62.39×65.67px。
 
+### 六层后牌预览与五色样本
+
+- `back-card-preview-first-pass-platform-layout-level27-390x844.png`、`320x568.png`：第 27 关首次改为每列最多显示六张后牌颜色窄带。
+- `back-card-preview-recheck-platform-layout-level27-390x844.png`、`320x568.png`：同状态复验；六层色带均有独立位置和本关真实颜色，首牌继续保持 76×80px／62.39×65.67px，页面无横向溢出。
+- `back-card-preview-recheck-external-guest-level27-390x844.png`：外部访客栏正常覆盖顶部扩展区，未挤压或破坏下方牌列。
+- 第 27 关是正式五色压力样本：4035 针、28 次选择、标准解峰值等待 2，五步失败路径为 `2,2,2,2,2`。该项只证明题面具有可解性和机械压力；五色是否达到目标体验仍以当前真人试玩反馈为准。
+
 ### 主流程
 
 - `flow-final-platform-layout-level1-initial-390x844.png`
