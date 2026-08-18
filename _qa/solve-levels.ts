@@ -1,6 +1,6 @@
-import { createCells, createColumns, LEVELS } from '../src/game/levels'
-import { chooseReachableCell, findReachable, reachableColors } from '../src/game/reachability'
-import type { ActiveSlot, Cell, SpoolState } from '../src/game/types'
+import { createCells, createColumns, LEVELS } from '../src/game/levels.ts'
+import { chooseReachableCell, findReachable, reachableColors } from '../src/game/reachability.ts'
+import type { ActiveSlot, Cell, SpoolState } from '../src/game/types.ts'
 
 interface SearchState {
   cells: Cell[][]
@@ -81,43 +81,89 @@ function findSolution(initial: SearchState): number[] | null {
 }
 
 function findFailure(initial: SearchState): number[] | null {
-  const queue = [{ state: initial, path: [] as number[] }]
   const seen = new Set<string>()
-  while (queue.length) {
-    const current = queue.shift()!
-    const stateKey = key(current.state)
-    if (seen.has(stateKey)) continue
+  function visit(state: SearchState, path: number[]): number[] | null {
+    const stateKey = key(state)
+    if (seen.has(stateKey)) return null
     seen.add(stateKey)
-    if (current.path.length >= 5) continue
-    const available = reachableColors(current.state.cells, findReachable(current.state.cells))
-    const choices = current.state.columns
+    if (path.length >= 5) return null
+    const available = reachableColors(state.cells, findReachable(state.cells))
+    const choices = state.columns
       .map((column, index) => ({ index, spool: column[0] }))
       .filter((choice) => choice.spool)
       .sort((a, b) => Number(available.has(a.spool!.color)) - Number(available.has(b.spool!.color)))
     for (const choice of choices) {
-      const result = select(current.state, choice.index)
+      const result = select(state, choice.index)
       if (!result) continue
-      const path = [...current.path, choice.index]
-      if (result.failed) return path
-      if (!result.complete) queue.push({ state: result.state, path })
+      const nextPath = [...path, choice.index]
+      if (result.failed) return nextPath
+      if (!result.complete) {
+        const failure = visit(result.state, nextPath)
+        if (failure) return failure
+      }
     }
+    return null
   }
-  return null
+  return visit(initial, [])
 }
 
 const requestedLevel = Number(process.env.STITCH_SPRITES_LEVEL ?? 0)
 const levels = requestedLevel > 0 ? LEVELS.filter((level) => level.id === requestedLevel) : LEVELS
-const failureCheckLevels = new Set([7, 20, 35])
+const failureAuditLevels = new Set(LEVELS.filter((level) => level.id >= 10).map((level) => level.id))
+const requiredFailureLevels = new Set([10, 27, 35])
+const skipFailure = process.env.STITCH_SPRITES_SKIP_FAILURE === '1'
 
-function validatesSolution(initial: SearchState, path: number[]): boolean {
+interface SolutionMetrics {
+  valid: boolean
+  peakWaitingSlots: number
+  repeatedColumnRate: number
+  longestColumnRun: number
+  colorRuns: number
+}
+
+function measureSolution(initial: SearchState, path: number[]): SolutionMetrics {
   let state = initial
+  let peakWaitingSlots = 0
+  let longestColumnRun = 0
+  let currentColumnRun = 0
+  let previousColumn = -1
+  let colorRuns = 0
+  let previousColor = ''
   for (const column of path) {
+    const color = state.columns[column]?.[0]?.color ?? ''
+    if (column === previousColumn) currentColumnRun += 1
+    else currentColumnRun = 1
+    longestColumnRun = Math.max(longestColumnRun, currentColumnRun)
+    previousColumn = column
+    if (color !== previousColor) colorRuns += 1
+    previousColor = color
     const result = select(state, column)
-    if (!result || result.failed) return false
-    if (result.complete) return true
+    if (!result || result.failed) return {
+      valid: false,
+      peakWaitingSlots,
+      repeatedColumnRate: 0,
+      longestColumnRun,
+      colorRuns,
+    }
+    peakWaitingSlots = Math.max(peakWaitingSlots, result.state.slots.length)
+    if (result.complete) return {
+      valid: true,
+      peakWaitingSlots,
+      repeatedColumnRate: path.length > 1
+        ? path.slice(1).filter((value, index) => value === path[index]).length / (path.length - 1)
+        : 0,
+      longestColumnRun,
+      colorRuns,
+    }
     state = result.state
   }
-  return false
+  return {
+    valid: false,
+    peakWaitingSlots,
+    repeatedColumnRate: 0,
+    longestColumnRun,
+    colorRuns,
+  }
 }
 
 const summaries = []
@@ -129,9 +175,10 @@ for (const level of levels) {
     sequence: 0,
   }
   const solution = level.solution
-  const failure = failureCheckLevels.has(level.id) ? findFailure(initial) : null
-  if (!solution || !validatesSolution(initial, solution)) throw new Error(`Level ${level.id} has no valid solution`)
-  if (failureCheckLevels.has(level.id) && !failure) throw new Error(`Difficulty checkpoint ${level.id} has no failure path within 5 selections`)
+  const metrics = solution ? measureSolution(initial, solution) : null
+  if (!solution || !metrics?.valid) throw new Error(`Level ${level.id} has no valid solution`)
+  const failure = !skipFailure && failureAuditLevels.has(level.id) ? findFailure(initial) : null
+  if (!skipFailure && requiredFailureLevels.has(level.id) && !failure) throw new Error(`Difficulty checkpoint ${level.id} has no failure path within 5 selections`)
   const spools = level.columns.flat()
   const summary = {
     level: level.id,
@@ -140,6 +187,10 @@ for (const level of levels) {
     selections: solution.length,
     minCapacity: Math.min(...spools.map((spool) => spool.capacity)),
     maxCapacity: Math.max(...spools.map((spool) => spool.capacity)),
+    colorRuns: metrics.colorRuns,
+    repeatedColumnRate: Number(metrics.repeatedColumnRate.toFixed(2)),
+    longestColumnRun: metrics.longestColumnRun,
+    peakWaitingSlots: metrics.peakWaitingSlots,
     failure,
   }
   summaries.push(summary)
@@ -147,10 +198,13 @@ for (const level of levels) {
 }
 
 const selectionCounts = summaries.map((summary) => summary.selections)
+const failureAudited = summaries.filter((summary) => summary.level >= 10)
 console.log(JSON.stringify({
   ok: true,
   levels: summaries.length,
   minSelections: Math.min(...selectionCounts),
   maxSelections: Math.max(...selectionCounts),
   averageSelections: Number((selectionCounts.reduce((sum, value) => sum + value, 0) / selectionCounts.length).toFixed(1)),
+  failurePaths: failureAudited.filter((summary) => summary.failure).length,
+  failureAudited: failureAudited.length,
 }))

@@ -28,6 +28,12 @@ PALETTE = {
 
 PEEL_PRIORITY = tuple(PALETTE)
 COLUMN_WEAVE = (0, 1, 2, 3, 1, 0, 3, 2, 0, 2, 1, 3)
+RUN_COLUMN_PAIRS = ((0, 1), (2, 3), (1, 3), (0, 2), (0, 3), (1, 2))
+
+# Phase-one difficulty probes. These levels must prove that a correct solution
+# can intentionally carry 1 / 2 / 3 reels across a later color opening before
+# the same contract is expanded to the full chapter curve.
+DIFFICULTY_V2_SAMPLES = {10: 1, 27: 2, 35: 3}
 
 HUES = {
     code: colorsys.rgb_to_hsv(*(int(color[index:index + 2], 16) / 255 for index in (1, 3, 5)))[0]
@@ -153,7 +159,73 @@ def target_selections(color_count: int) -> int:
     return 29
 
 
-def build_spool_plan(pattern: list[str]) -> tuple[list[list[tuple[str, int]]], list[int]]:
+def requested_carry_reels(level: int) -> int:
+    if level < 10 or level == 28:
+        return 0
+    if level <= 26:
+        return 1
+    if level == 27:
+        return 2
+    if level <= 32:
+        return 1
+    if level <= 34:
+        return 2
+    return 3
+
+
+def merge_carry_spools(
+    spools: list[tuple[str, int]],
+    target_overlap: int,
+) -> list[tuple[str, int]]:
+    """Merge separated same-color reels so correct reels wait across later openings."""
+    occurrences: dict[str, list[int]] = {}
+    for index, (color, _) in enumerate(spools):
+        occurrences.setdefault(color, []).append(index)
+    candidates: list[tuple[int, int, str]] = []
+    for color, indices in occurrences.items():
+        for start, end in zip(indices, indices[1:]):
+            if end - start >= 2:
+                candidates.append((start, end, color))
+
+    best: list[tuple[int, int, str]] = []
+    for point in range(1, len(spools) - 1):
+        covering = sorted(
+            (candidate for candidate in candidates if candidate[0] < point < candidate[1]),
+            key=lambda candidate: (candidate[1] - candidate[0], candidate[0]),
+        )
+        selected: list[tuple[int, int, str]] = []
+        used_colors: set[str] = set()
+        used_indices: set[int] = set()
+        for candidate in covering:
+            start, end, color = candidate
+            if color in used_colors or start in used_indices or end in used_indices:
+                continue
+            selected.append(candidate)
+            used_colors.add(color)
+            used_indices.update((start, end))
+            if len(selected) == target_overlap:
+                break
+        if len(selected) > len(best):
+            best = selected
+        if len(best) == target_overlap:
+            break
+
+    if len(best) < target_overlap:
+        raise ValueError(f"could only create {len(best)} overlapping carry reels, need {target_overlap}")
+
+    merged = list(spools)
+    removed: set[int] = set()
+    for start, end, _ in best:
+        color, capacity = merged[start]
+        future_color, future_capacity = merged[end]
+        if color != future_color:
+            raise ValueError("carry merge changed color")
+        merged[start] = (color, capacity + future_capacity)
+        removed.add(end)
+    return [spool for index, spool in enumerate(merged) if index not in removed]
+
+
+def build_spool_plan(pattern: list[str], level: int) -> tuple[list[list[tuple[str, int]]], list[int]]:
     """Create the solvable reel order offline; page startup must never solve all 35 levels."""
     cells = [list(row) for row in pattern]
     rows = len(cells)
@@ -189,6 +261,7 @@ def build_spool_plan(pattern: list[str]) -> tuple[list[list[tuple[str, int]]], l
     stitch_count = sum(code != "." for row in cells for code in row)
     color_count = len({code for row in cells for code in row if code != "."})
     max_reel = max(1, (stitch_count + target_selections(color_count) - 1) // target_selections(color_count))
+    carry_target = requested_carry_reels(level)
     spools: list[tuple[str, int]] = []
     priority_cursor = 0
     active_color: str | None = None
@@ -228,8 +301,43 @@ def build_spool_plan(pattern: list[str]) -> tuple[list[list[tuple[str, int]]], l
         if not remains_reachable:
             priority_cursor = (chosen_priority + 1) % len(PEEL_PRIORITY)
 
+    applied_carry = 0
+    for candidate_target in range(carry_target, 0, -1):
+        try:
+            spools = merge_carry_spools(spools, candidate_target)
+            applied_carry = candidate_target
+            break
+        except ValueError:
+            continue
+
+    sample_target = DIFFICULTY_V2_SAMPLES.get(level)
+    if sample_target is not None and applied_carry < sample_target:
+        raise ValueError(f"level {level} only supports {applied_carry} carry reels, needs {sample_target}")
+
     columns: list[list[tuple[str, int]]] = [[], [], [], []]
     solution: list[int] = []
+    if level >= 3:
+        run_index = -1
+        run_position = 0
+        previous_color: str | None = None
+        previous_column = -1
+        pair = RUN_COLUMN_PAIRS[0]
+        for spool in spools:
+            color = spool[0]
+            if color != previous_color:
+                run_index += 1
+                run_position = 0
+                pair = RUN_COLUMN_PAIRS[run_index % len(RUN_COLUMN_PAIRS)]
+                if pair[0] == previous_column:
+                    pair = (pair[1], pair[0])
+            column = pair[run_position % 2]
+            columns[column].append(spool)
+            solution.append(column)
+            previous_color = color
+            previous_column = column
+            run_position += 1
+        return columns, solution
+
     run_index = -1
     previous_color: str | None = None
     for color, capacity in spools:
@@ -845,7 +953,12 @@ def main() -> None:
 
     ordered = sorted(
         source_patterns.items(),
-        key=lambda item: pattern_metrics(item[1]),
+        key=lambda item: (
+            pattern_metrics(item[1])[0],
+            -pattern_metrics(item[1])[1],
+            pattern_metrics(item[1])[2],
+            pattern_metrics(item[1])[3],
+        ),
     )
     patterns = {level: pattern for level, (_, pattern) in enumerate(ordered, start=1)}
     cropped_tiles = {level: source_tiles[key] for level, (key, _) in enumerate(ordered, start=1)}
@@ -871,7 +984,7 @@ def main() -> None:
     order_lines = [
         "# Generated level order",
         "",
-        "Primary sort is actual color count; ties use exposed colors, color transitions, then stitch count.",
+        "Primary sort is actual color count. Within a color chapter, more initially exposed colors come first (more legal choices), then color transitions and stitch count rise.",
         "",
         "| Level | Pattern | Colors | Exposed | Transitions | Stitches |",
         "| ---: | --- | ---: | ---: | ---: | ---: |",
@@ -883,7 +996,7 @@ def main() -> None:
         lines.append(f"    colorCount: {colors}, exposedColorCount: {exposed}, transitions: {transitions}, stitchCount: {stitches},")
         palette_literal = ", ".join(f"{code}: '{color}'" for code, color in source_palettes[key].items())
         lines.append(f"    palette: {{ {palette_literal} }},")
-        columns, solution = build_spool_plan(pattern)
+        columns, solution = build_spool_plan(pattern, level)
         column_literal = ", ".join(
             "[" + ", ".join(f"['{code}', {capacity}]" for code, capacity in column) + "]"
             for column in columns

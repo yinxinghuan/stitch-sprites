@@ -3,7 +3,7 @@ import type { ActiveSlot, GamePhase, SpoolState } from './types'
 
 export const PROGRESS_KEY = 'stitch_sprites_progress_v2'
 export const LEGACY_LEVEL_KEY = 'stitch_sprites_level'
-export const PROGRESS_VERSION = 2
+export const PROGRESS_VERSION = 3
 
 export interface StableRunState {
   levelId: number
@@ -57,7 +57,8 @@ export function emptyProgress(): PersistedProgress {
 export function normalizeProgress(value: unknown): PersistedProgress | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<PersistedProgress>
-  if (candidate.version !== PROGRESS_VERSION) return null
+  const sourceVersion = Number(candidate.version)
+  if (sourceVersion !== 2 && sourceVersion !== PROGRESS_VERSION) return null
   const bestByLevel: Record<string, number> = {}
   if (candidate.bestByLevel && typeof candidate.bestByLevel === 'object') {
     Object.entries(candidate.bestByLevel).forEach(([key, score]) => {
@@ -68,7 +69,9 @@ export function normalizeProgress(value: unknown): PersistedProgress | null {
       }
     })
   }
-  const currentRun = candidate.currentRun && validateRun(candidate.currentRun)
+  // Version 2 runs contain the old reel layout. Keep long-term progress, but
+  // deliberately restart the in-progress level against difficulty v2.
+  const currentRun = sourceVersion === PROGRESS_VERSION && candidate.currentRun && validateRun(candidate.currentRun)
     ? structuredClone(candidate.currentRun)
     : null
   return {
