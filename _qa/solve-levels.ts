@@ -110,7 +110,7 @@ function findFailure(initial: SearchState): number[] | null {
 const requestedLevel = Number(process.env.STITCH_SPRITES_LEVEL ?? 0)
 const levels = requestedLevel > 0 ? LEVELS.filter((level) => level.id === requestedLevel) : LEVELS
 const failureAuditLevels = new Set(LEVELS.filter((level) => level.id >= 10).map((level) => level.id))
-const requiredFailureLevels = new Set([10, 27, 35])
+const requiredFailureLevels = new Set([10, 27, 35, 36, 37, 38, 39, 40, 41, 42])
 const skipFailure = process.env.STITCH_SPRITES_SKIP_FAILURE === '1'
 
 interface SolutionMetrics {
@@ -194,6 +194,15 @@ for (const level of levels) {
     failure,
   }
   summaries.push(summary)
+  if (level.id >= 36) {
+    const expectedPeak = new Map([[36, 1], [37, 1], [38, 2], [39, 2], [40, 3], [41, 3], [42, 4]]).get(level.id)
+    if (metrics.peakWaitingSlots !== expectedPeak) {
+      throw new Error(`Challenge level ${level.id}: expected peak ${expectedPeak}, found ${metrics.peakWaitingSlots}`)
+    }
+    if (solution.length < 22 || solution.length > 38) {
+      throw new Error(`Challenge level ${level.id}: expected 22–38 selections, found ${solution.length}`)
+    }
+  }
   console.log(JSON.stringify(summary))
 }
 

@@ -74,10 +74,14 @@ export function normalizeProgress(value: unknown): PersistedProgress | null {
   const currentRun = sourceVersion === PROGRESS_VERSION && candidate.currentRun && validateRun(candidate.currentRun)
     ? structuredClone(candidate.currentRun)
     : null
+  const storedUnlockedLevel = clampLevel(candidate.unlockedLevel)
+  const unlockedLevel = LEVELS.length > 35 && storedUnlockedLevel >= 35 && bestByLevel['35']
+    ? Math.max(storedUnlockedLevel, 36)
+    : storedUnlockedLevel
   return {
     version: PROGRESS_VERSION,
     updatedAt: Number.isFinite(Number(candidate.updatedAt)) ? Number(candidate.updatedAt) : Date.now(),
-    unlockedLevel: clampLevel(candidate.unlockedLevel),
+    unlockedLevel,
     bestByLevel,
     currentRun,
     ...(candidate.economy ? { economy: candidate.economy } : {}),

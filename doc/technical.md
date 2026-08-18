@@ -20,7 +20,7 @@ src/
   game/
     engine.ts                    权威状态、选牌、批次工作、完成/失败/存档
     progress.ts                  稳定节点存档 schema、本地仓库、合并与绣艺分
-    levels.ts                    把离线数据组装为 35 个 LevelDefinition
+    levels.ts                    把离线数据组装为 42 个 LevelDefinition
     generated-patterns.ts        生成的网格、逐关调色板、四列线轴与解法
     reachability.ts              外部洪泛、可达颜色、目标与步行路径
     renderer.ts                  Canvas 静态缓存、源纹理遮罩、精灵与线束动画
@@ -35,21 +35,22 @@ src/
     create-platform-services.ts  本地优先存档与可选 Aigram 适配器装配
     aigram-bridge.ts             Aigram Web/iOS 双通道请求与资料页桥接
 public/
-  patterns/<key>.png             35 张透明高清十字绣纹理
+  patterns/<key>.png             42 张透明高清十字绣纹理
   alteru-storage-scope.js        自托管 session 隔离存储适配器
 scripts/
   generate-stitch-patterns.py    裁图、原生针点、无飞地、纹理和关卡数据生成
 doc/references/
   chapter-*-candidate-*.png      已接受源素材页
+  topology-challenge-candidates-v1.png  拓扑挑战章的 8 图概念母版
   level-square-audit/            每关独立 1:1 裁切审核图
   generated-pattern-order.md     当前颜色/复杂度排序证据
 _qa/
-  solve-levels.ts                35 关解法与失败路径回放
+  solve-levels.ts                42 关解法与失败路径回放
   progress-migration.ts          v2 存档到 v3 牌序迁移回归
   feature-regression.mjs         首动风险、稳定存档、可选榜单与双击缩放回归
   capture-levels.mjs             全关截图、溢出和卡牌均衡检查
   capture.mjs                    首动、完成、失败、窄屏、外部访客流程
-  capture-gallery.mjs            35 张图鉴与解锁检查
+  capture-gallery.mjs            42 张图鉴、底部滚动稳定与解锁检查
   capture-walk.mjs               行走/拆线/持续推进时间序列
   perf.mjs                       CPU 限速输入与帧率采样
 ```
@@ -62,13 +63,15 @@ _qa/
 
 1. 从素材页的针脚密度谷推断分割边界。
 2. 对单图找前景、闭合主体和原生网格相位；移除布纹噪声、相邻碎片和主体包络外飞地。
-3. 按素材自身 5/7/8px 针距采样，不统一重采样分辨率。
+3. 按素材自身 4/5/7/8px 针距采样，不统一重采样分辨率。
 4. 输出逻辑玩法色 `rows`、逐关源色 `palette` 和透明源纹理 `public/patterns/<key>.png`。
 5. 用增量外部洪泛离线生成可拆顺序和线轴容量；第 3 关起把同色段交替放入两列，避免旧版“一列点到底”。
 6. 第 10 关起按关卡结构合并跨层同色线轴，让正确线轴也可能保留容量等待后续开路；第 10／27／35 关分别强制验证 1／2／3 个等待槽。
-7. 先按颜色数分章；同章内初始暴露颜色越多越靠前（合法选择更多），再按颜色转折和针脚量递增，最后写入 `generated-patterns.ts`。
+7. 原 35 关继续按颜色数分章并保持稳定编号；挑战章只追加 36–42 关，防止老存档的逐关最好分错位。
+8. 挑战章先用带一格运行时外边界的洪泛把最外三层统一为一个入口色，并只对改色针格做保留明暗和纤维的色相重映射；原图内部纹理不重绘。
+9. 36–42 关分别固定标准解峰值等待 1／1／2／2／3／3／4；生成后仍由 TypeScript 权威规则回放解法和五步失败路径。
 
-线轴方案必须离线生成。旧实现曾在页面启动时计算 35 关，导致高密度数据初始化超过 30 秒；当前运行时只读取预生成结果，模块初始化约 0.1 秒。
+线轴方案必须离线生成。旧实现曾在页面启动时计算整套关卡，导致高密度数据初始化超过 30 秒；当前运行时只读取 42 关预生成结果，模块初始化约 0.1 秒。
 
 ### 状态与规则
 
@@ -81,7 +84,7 @@ _qa/
 
 第 1 关只在第一次输入强制正确列；第一次真实拆线后，所有关卡都允许错误颜色进入等待轴位。第 1–2 关首次五槽堵塞会展示 650ms 后自动退回最后一卷，第 3 关起进入真实失败。
 
-`progress.ts` 以版本化 `PersistedProgress` 保存最高解锁关、逐关最佳绣艺分和当前稳定关卡状态。引擎只在关卡载入或整批任务结算后写入，保存已拆格索引、四列、五槽和本局决策统计；动画中途关闭会回到上一稳定节点。难度 v2 把 schema 升到版本 3：读取 v2 时保留已解锁关、最佳分和预留经济字段，但清空与旧牌序不兼容的 `currentRun`。`alteruLocalStorage` 负责同部署 UUID 的本地隔离；平台适配器存在时以 1 秒防抖同步相同 JSON 到 Aigram 云存档。云数据只在本次尚无玩家操作时接管当前局，本地与云端的解锁关和逐关最好分始终取并集/最大值。
+`progress.ts` 以版本化 `PersistedProgress` 保存最高解锁关、逐关最佳绣艺分和当前稳定关卡状态。引擎只在关卡载入或整批任务结算后写入，保存已拆格索引、四列、五槽和本局决策统计；动画中途关闭会回到上一稳定节点。难度 v2 把 schema 升到版本 3：读取 v2 时保留已解锁关、最佳分和预留经济字段，但清空与旧牌序不兼容的 `currentRun`。追加 36–42 关不再改变 schema：只有最高解锁为 35 且已存在第 35 关最好成绩的旧终章完成者迁移到解锁 36，仅解锁未完成者仍停在 35。`alteruLocalStorage` 负责同部署 UUID 的本地隔离；平台适配器存在时以 1 秒防抖同步相同 JSON 到 Aigram 云存档。云数据只在本次尚无玩家操作时接管当前局，本地与云端的解锁关和逐关最好分始终取并集/最大值。
 
 绣艺分不使用时间：单关为 `1000 + levelId × 25 + 零错误奖励 250 + 无帮助奖励 250`，每关只保留最好一次，总分为逐关最好分之和。这样金币、广告和未来速度升级不会改变排行榜公平性。
 
@@ -95,7 +98,7 @@ _qa/
 
 源纹理通过 `new URL('./patterns/<key>.png', document.baseURI)` 加载，兼容任意部署子路径。纹理未完成加载时使用逻辑针点后备绘制；成功后一次 `drawImage` 进入遮罩，不逐针重绘高清图。无动态任务时停止 RAF。进入完成/失败时清空残余任务，防止结算后角色堆积。
 
-最新压力证据：第 35 关、390×844、2× DPR、6× CPU 限速，首个可见响应约 16.5ms，平均帧间隔 8.79ms，p95 10.3ms，最差 42.3ms，无 >50ms 帧。
+最新压力证据：最密第 42 关、390×844、2× DPR、6× CPU 限速，输入派发 22.5ms，首个可见响应 27.5ms，平均帧间隔 8.91ms，p95 10.3ms，最差 41.6ms，无 >50ms 帧。
 
 ### UI、输入、音频与 i18n
 
@@ -106,7 +109,7 @@ _qa/
 ## 4. 扩展点
 
 - **新增/替换图案**：把素材页放入 `doc/references/`，更新生成脚本 `SOURCES`，运行生成器；不要手改 `generated-patterns.ts` 或 `public/patterns/`。
-- **调整难度排序与每关选择数**：修改生成脚本的同章排序键、`target_selections()`、`requested_carry_reels()` 或 `RUN_COLUMN_PAIRS`，重新生成并跑全关解法、五步失败路径和 v2 存档迁移。
+- **调整难度排序与每关选择数**：修改生成脚本的同章排序键、`target_selections()`、`requested_carry_reels()`、`CHALLENGE_CARRY_TARGETS` 或 `RUN_COLUMN_PAIRS`，重新生成并跑全关解法、五步失败路径和 v2 存档迁移。
 - **修改可达/失败规则**：编辑 `reachability.ts` 与 `engine.ts`，同步更新生成器中的离线洪泛合同。
 - **调整颜色和符号**：编辑 `palette.ts`；逐关源色仍由生成器输出。
 - **调整精灵、拆线或回收演出**：编辑 `renderer.ts` 的任务时间与绘制函数；必须复验行走、异步回收和最密关性能。

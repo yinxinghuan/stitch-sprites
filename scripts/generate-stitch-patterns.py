@@ -35,6 +35,30 @@ RUN_COLUMN_PAIRS = ((0, 1), (2, 3), (1, 3), (0, 2), (0, 3), (1, 2))
 # the same contract is expanded to the full chapter curve.
 DIFFICULTY_V2_SAMPLES = {10: 1, 27: 2, 35: 3}
 
+# Topology-first expansion levels are appended after the established 35-level
+# collection so existing progress ids remain stable. Their art was generated as
+# a concept sheet, but acceptance is mechanical: each key carries its own
+# intended standard-solution waiting pressure.
+CHALLENGE_CARRY_TARGETS = {
+    "gardenLantern": 1,
+    "nestingDoll": 1,
+    "aquarium": 2,
+    "sleepingFox": 2,
+    "carouselBox": 3,
+    "clockworkOwl": 3,
+    "greenhouse": 4,
+}
+CHALLENGE_ORDER = tuple(CHALLENGE_CARRY_TARGETS)
+CHALLENGE_SHELLS = {
+    "gardenLantern": "P",
+    "nestingDoll": "R",
+    "aquarium": "P",
+    "sleepingFox": "P",
+    "carouselBox": "B",
+    "clockworkOwl": "P",
+    "greenhouse": "P",
+}
+
 HUES = {
     code: colorsys.rgb_to_hsv(*(int(color[index:index + 2], 16) / 255 for index in (1, 3, 5)))[0]
     for code, color in PALETTE.items()
@@ -80,6 +104,13 @@ SOURCES = [
     ("alteruSun", "alteru-logo-stitch-candidates.png", 2, 2, 1, 8),
     ("alteruNight", "alteru-logo-stitch-candidates.png", 2, 2, 2, 8),
     ("alteruBloom", "alteru-logo-stitch-candidates.png", 2, 2, 3, 8),
+    ("gardenLantern", "topology-challenge-candidates-v1.png", 4, 2, 1, 4),
+    ("clockworkOwl", "topology-challenge-candidates-v1.png", 4, 2, 2, 4),
+    ("aquarium", "topology-challenge-candidates-v1.png", 4, 2, 3, 4),
+    ("nestingDoll", "topology-challenge-candidates-v1.png", 4, 2, 4, 4),
+    ("greenhouse", "topology-challenge-candidates-v1.png", 4, 2, 5, 4),
+    ("sleepingFox", "topology-challenge-candidates-v1.png", 4, 2, 6, 4),
+    ("carouselBox", "topology-challenge-candidates-v1.png", 4, 2, 7, 4),
 ]
 
 _STITCH_BOUNDARY_CACHE: dict[tuple[int, int, int], list[int]] = {}
@@ -147,7 +178,9 @@ def tile_crop(image: Image.Image, columns: int, rows: int, tile_index: int) -> I
     return panel.crop((bx0, by0, bx1, by1))
 
 
-def target_selections(color_count: int) -> int:
+def target_selections(color_count: int, key: str | None = None) -> int:
+    if key == "nestingDoll":
+        return 20
     if color_count <= 2:
         return 14
     if color_count == 3:
@@ -159,7 +192,9 @@ def target_selections(color_count: int) -> int:
     return 29
 
 
-def requested_carry_reels(level: int) -> int:
+def requested_carry_reels(level: int, key: str | None = None) -> int:
+    if key in CHALLENGE_CARRY_TARGETS:
+        return CHALLENGE_CARRY_TARGETS[key]
     if level < 10 or level == 28:
         return 0
     if level <= 26:
@@ -225,8 +260,8 @@ def merge_carry_spools(
     return [spool for index, spool in enumerate(merged) if index not in removed]
 
 
-def build_spool_plan(pattern: list[str], level: int) -> tuple[list[list[tuple[str, int]]], list[int]]:
-    """Create the solvable reel order offline; page startup must never solve all 35 levels."""
+def build_spool_plan(pattern: list[str], level: int, key: str | None = None) -> tuple[list[list[tuple[str, int]]], list[int]]:
+    """Create the solvable reel order offline; page startup never solves the collection."""
     cells = [list(row) for row in pattern]
     rows = len(cells)
     cols = len(cells[0])
@@ -260,8 +295,8 @@ def build_spool_plan(pattern: list[str], level: int) -> tuple[list[list[tuple[st
     expand([(0, 0)])
     stitch_count = sum(code != "." for row in cells for code in row)
     color_count = len({code for row in cells for code in row if code != "."})
-    max_reel = max(1, (stitch_count + target_selections(color_count) - 1) // target_selections(color_count))
-    carry_target = requested_carry_reels(level)
+    max_reel = max(1, (stitch_count + target_selections(color_count, key) - 1) // target_selections(color_count, key))
+    carry_target = requested_carry_reels(level, key)
     spools: list[tuple[str, int]] = []
     priority_cursor = 0
     active_color: str | None = None
@@ -313,6 +348,8 @@ def build_spool_plan(pattern: list[str], level: int) -> tuple[list[list[tuple[st
     sample_target = DIFFICULTY_V2_SAMPLES.get(level)
     if sample_target is not None and applied_carry < sample_target:
         raise ValueError(f"level {level} only supports {applied_carry} carry reels, needs {sample_target}")
+    if key in CHALLENGE_CARRY_TARGETS and applied_carry < carry_target:
+        raise ValueError(f"candidate {key} only supports {applied_carry} carry reels, needs {carry_target}")
 
     columns: list[list[tuple[str, int]]] = [[], [], [], []]
     solution: list[int] = []
@@ -537,7 +574,7 @@ def external_empty(pattern: list[list[str]]) -> set[tuple[int, int]]:
     return seen
 
 
-def enforce_shell(pattern: list[list[str]], shell: str, layers: int = 2) -> None:
+def enforce_shell(pattern: list[list[str]], shell: str, layers: int = 2) -> set[tuple[int, int]]:
     exterior = external_empty(pattern)
     frontier = set(exterior)
     claimed: set[tuple[int, int]] = set()
@@ -554,6 +591,23 @@ def enforce_shell(pattern: list[list[str]], shell: str, layers: int = 2) -> None
                 claimed.add((nr, nc))
                 next_frontier.add((nr, nc))
         frontier = next_frontier
+    return claimed
+
+
+def enforce_runtime_shell(pattern: list[list[str]], shell: str, layers: int = 2) -> set[tuple[int, int]]:
+    """Color the same outer frontier the runtime sees, including the trimmed chart boundary."""
+    width = len(pattern[0])
+    padded = [["."] * (width + 2)]
+    padded.extend([[".", *row, "."] for row in pattern])
+    padded.append(["."] * (width + 2))
+    claimed = enforce_shell(padded, shell, layers)
+    for row in range(len(pattern)):
+        pattern[row][:] = padded[row + 1][1:-1]
+    return {
+        (row - 1, col - 1)
+        for row, col in claimed
+        if 1 <= row <= len(pattern) and 1 <= col <= width
+    }
 
 
 def fill_logo_negative_space(pattern: list[list[str]]) -> None:
@@ -689,12 +743,35 @@ def save_source_texture(
     pattern: list[list[str]],
     origin: tuple[int, int],
     pitch: int,
+    recolor_cells: set[tuple[int, int]] | None = None,
+    palette: dict[str, str] | None = None,
 ) -> None:
     """Preserve the approved source stitch texture cell-for-cell with transparent empty cells."""
     top, left = origin
     width = len(pattern[0]) * pitch
     height = len(pattern) * pitch
     source = tile.convert("RGBA").crop((left, top, left + width, top + height))
+    if recolor_cells and palette:
+        pixels = np.asarray(source).copy()
+        for row, col in recolor_cells:
+            code = pattern[row][col]
+            target = palette.get(code, PALETTE[code])
+            target_rgb = tuple(int(target[index:index + 2], 16) / 255 for index in (1, 3, 5))
+            target_hue, target_saturation, _ = colorsys.rgb_to_hsv(*target_rgb)
+            y0, x0 = row * pitch, col * pitch
+            block = pixels[y0:y0 + pitch, x0:x0 + pitch, :3].astype(np.float32) / 255
+            for py in range(block.shape[0]):
+                for px in range(block.shape[1]):
+                    hue, saturation, value = colorsys.rgb_to_hsv(*block[py, px].tolist())
+                    if saturation < 0.16 and value > 0.48:
+                        continue
+                    recolored = colorsys.hsv_to_rgb(
+                        target_hue,
+                        min(1.0, max(saturation, target_saturation * 0.72)),
+                        value,
+                    )
+                    pixels[y0 + py, x0 + px, :3] = np.clip(np.round(np.asarray(recolored) * 255), 0, 255)
+        source = Image.fromarray(pixels.astype(np.uint8), "RGBA")
     alpha = Image.new("L", (width, height), 0)
     alpha_draw = ImageDraw.Draw(alpha)
     for row, line in enumerate(pattern):
@@ -945,14 +1022,26 @@ def main() -> None:
         remove_separator_artifacts(pattern)
         pattern = retain_closed_main_figure(pattern)
         pattern, swatches, trim_row, trim_col = trim_parallel(pattern, swatches)
+        recolor_cells: set[tuple[int, int]] = set()
+        if key in CHALLENGE_SHELLS:
+            recolor_cells = enforce_runtime_shell(pattern, CHALLENGE_SHELLS[key], layers=3)
         origin = (origin[0] + trim_row * pitch, origin[1] + trim_col * pitch)
         validate_no_enclaves(pattern, key)
         source_patterns[key] = ["".join(row) for row in pattern]
         source_palettes[key] = extract_level_palette(tile, codes)
-        save_source_texture(key, tile, source_patterns[key], origin, pitch)
+        save_source_texture(
+            key,
+            tile,
+            source_patterns[key],
+            origin,
+            pitch,
+            recolor_cells,
+            source_palettes[key],
+        )
 
+    base_items = [item for item in source_patterns.items() if item[0] not in CHALLENGE_CARRY_TARGETS]
     ordered = sorted(
-        source_patterns.items(),
+        base_items,
         key=lambda item: (
             pattern_metrics(item[1])[0],
             -pattern_metrics(item[1])[1],
@@ -960,6 +1049,7 @@ def main() -> None:
             pattern_metrics(item[1])[3],
         ),
     )
+    ordered.extend((key, source_patterns[key]) for key in CHALLENGE_ORDER)
     patterns = {level: pattern for level, (_, pattern) in enumerate(ordered, start=1)}
     cropped_tiles = {level: source_tiles[key] for level, (key, _) in enumerate(ordered, start=1)}
     ordered_palettes = {level: source_palettes[key] for level, (key, _) in enumerate(ordered, start=1)}
@@ -996,7 +1086,7 @@ def main() -> None:
         lines.append(f"    colorCount: {colors}, exposedColorCount: {exposed}, transitions: {transitions}, stitchCount: {stitches},")
         palette_literal = ", ".join(f"{code}: '{color}'" for code, color in source_palettes[key].items())
         lines.append(f"    palette: {{ {palette_literal} }},")
-        columns, solution = build_spool_plan(pattern, level)
+        columns, solution = build_spool_plan(pattern, level, key)
         column_literal = ", ".join(
             "[" + ", ".join(f"['{code}', {capacity}]" for code, capacity in column) + "]"
             for column in columns

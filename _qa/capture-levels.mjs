@@ -47,11 +47,11 @@ async function capture(level, viewport) {
 
 const results = []
 const firstLevel = requestedLevel > 0 ? requestedLevel : 1
-const lastLevel = requestedLevel > 0 ? requestedLevel : 35
+const lastLevel = requestedLevel > 0 ? requestedLevel : 42
 for (let level = firstLevel; level <= lastLevel; level += 1) {
   results.push(await capture(level, { width: 390, height: 844 }))
 }
-if (!requestedLevel || includeNarrow) results.push(await capture(requestedLevel || 35, { width: 320, height: 568 }))
+if (!requestedLevel || includeNarrow) results.push(await capture(requestedLevel || 42, { width: 320, height: 568 }))
 await browser.close()
 if (errors.length) throw new Error(errors.join('\n'))
 console.log(JSON.stringify({ ok: true, results }))

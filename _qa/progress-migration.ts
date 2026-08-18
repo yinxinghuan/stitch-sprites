@@ -27,4 +27,34 @@ if (legacy.unlockedLevel !== 27 || legacy.bestByLevel['27'] !== 2100) throw new 
 if (legacy.currentRun !== null) throw new Error('Old in-progress layout survived the difficulty migration')
 if (legacy.economy?.coins !== 45 || legacy.economy.speedTier !== 2) throw new Error('Forward-compatible economy data was lost')
 
-console.log(JSON.stringify({ ok: true, version: legacy.version, unlockedLevel: legacy.unlockedLevel, currentRun: legacy.currentRun }))
+const formerFinale = normalizeProgress({
+  version: PROGRESS_VERSION,
+  updatedAt: 2345,
+  unlockedLevel: 35,
+  bestByLevel: { 35: 2125 },
+  currentRun: null,
+})
+
+if (!formerFinale || formerFinale.unlockedLevel !== 36) {
+  throw new Error('A player who completed the former level 35 finale did not unlock level 36')
+}
+
+const merelyUnlockedFinale = normalizeProgress({
+  version: PROGRESS_VERSION,
+  updatedAt: 3456,
+  unlockedLevel: 35,
+  bestByLevel: {},
+  currentRun: null,
+})
+
+if (!merelyUnlockedFinale || merelyUnlockedFinale.unlockedLevel !== 35) {
+  throw new Error('A player who only unlocked level 35 incorrectly skipped to level 36')
+}
+
+console.log(JSON.stringify({
+  ok: true,
+  version: legacy.version,
+  unlockedLevel: legacy.unlockedLevel,
+  formerFinaleUnlockedLevel: formerFinale.unlockedLevel,
+  currentRun: legacy.currentRun,
+}))

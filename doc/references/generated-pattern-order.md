@@ -39,3 +39,10 @@ Primary sort is actual color count. Within a color chapter, more initially expos
 | 33 | `alteruNight` | 6 | 1 | 589 | 3327 |
 | 34 | `cottage` | 6 | 1 | 691 | 2345 |
 | 35 | `craftRoom` | 6 | 1 | 971 | 2658 |
+| 36 | `gardenLantern` | 6 | 1 | 2953 | 4935 |
+| 37 | `nestingDoll` | 6 | 1 | 2789 | 5117 |
+| 38 | `aquarium` | 6 | 1 | 2823 | 5098 |
+| 39 | `sleepingFox` | 6 | 1 | 1915 | 4656 |
+| 40 | `carouselBox` | 6 | 1 | 3326 | 5559 |
+| 41 | `clockworkOwl` | 6 | 1 | 3054 | 4911 |
+| 42 | `greenhouse` | 6 | 1 | 4021 | 5909 |
