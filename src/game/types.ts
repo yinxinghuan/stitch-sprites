@@ -30,6 +30,7 @@ export interface LevelDefinition {
 
 export interface ActiveSlot {
   slotId: number
+  sourceColumn: number
   spool: SpoolState
   state: 'working' | 'waiting'
 }
@@ -57,4 +58,8 @@ export interface GameSnapshot {
   remaining: number
   reachable: Set<string>
   messageKey: string
+  wrongDispatches: number
+  usedHelp: boolean
+  levelScore: number
+  totalMastery: number
 }

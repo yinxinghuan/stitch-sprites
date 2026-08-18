@@ -19,6 +19,7 @@ src/
   i18n.ts                        zh/en 文案
   game/
     engine.ts                    权威状态、选牌、批次工作、完成/失败/存档
+    progress.ts                  稳定节点存档 schema、本地仓库、合并与绣艺分
     levels.ts                    把离线数据组装为 35 个 LevelDefinition
     generated-patterns.ts        生成的网格、逐关调色板、四列线轴与解法
     reachability.ts              外部洪泛、可达颜色、目标与步行路径
@@ -29,6 +30,10 @@ src/
   ui/
     view.ts                      HUD、五槽、四列牌、绣品册、结算
     icons.ts                     统一 SVG 功能图标
+  platform/
+    contracts.ts                 可剥离的存档/排行榜端口
+    create-platform-services.ts  本地优先存档与可选 Aigram 适配器装配
+    aigram-bridge.ts             Aigram Web/iOS 双通道请求与资料页桥接
 public/
   patterns/<key>.png             35 张透明高清十字绣纹理
   alteru-storage-scope.js        自托管 session 隔离存储适配器
@@ -40,6 +45,7 @@ doc/references/
   generated-pattern-order.md     当前颜色/复杂度排序证据
 _qa/
   solve-levels.ts                35 关解法与失败路径回放
+  feature-regression.mjs         首动风险、稳定存档、可选榜单与双击缩放回归
   capture-levels.mjs             全关截图、溢出和卡牌均衡检查
   capture.mjs                    首动、完成、失败、窄屏、外部访客流程
   capture-gallery.mjs            35 张图鉴与解锁检查
@@ -71,7 +77,11 @@ _qa/
 - 任务抵达后才清除逻辑格、减少容量并批量发出状态更新。
 - 容量归零移除线轴；无剩余格进入完成；五槽满且无任务进入失败。
 
-教学关通过 `canSelectColumn()` 只开放当前可工作的颜色。存档只保存最高解锁关卡，使用 `alteruLocalStorage`，真实 key 由当前自托管 session UUID 隔离。
+第 1 关只在第一次输入强制正确列；第一次真实拆线后，所有关卡都允许错误颜色进入等待轴位。第 1–2 关首次五槽堵塞会展示 650ms 后自动退回最后一卷，第 3 关起进入真实失败。
+
+`progress.ts` 以版本化 `PersistedProgress` 保存最高解锁关、逐关最佳绣艺分和当前稳定关卡状态。引擎只在关卡载入或整批任务结算后写入，保存已拆格索引、四列、五槽和本局决策统计；动画中途关闭会回到上一稳定节点。`alteruLocalStorage` 负责同部署 UUID 的本地隔离；平台适配器存在时以 1 秒防抖同步相同 JSON 到 Aigram 云存档。云数据只在本次尚无玩家操作时接管当前局，本地与云端的解锁关和逐关最好分始终取并集/最大值。
+
+绣艺分不使用时间：单关为 `1000 + levelId × 25 + 零错误奖励 250 + 无帮助奖励 250`，每关只保留最好一次，总分为逐关最好分之和。这样金币、广告和未来速度升级不会改变排行榜公平性。
 
 ### 渲染与性能
 
@@ -87,9 +97,9 @@ _qa/
 
 ### UI、输入、音频与 i18n
 
-`GameView` 渲染 HUD、五槽、四列牌、绣品册和结果层。游戏牌用 `pointerdown`；可滚动绣品册卡片用 `click`。所有可见文案经过 `t()`，支持 zh/en。音频在首次手势后解锁，失败时静默降级，不参与权威状态更新。
+`GameView` 渲染 HUD、五槽、四列牌、绣品册、结果层和可选榜单。游戏牌用 `pointerdown`；可滚动绣品册和榜单使用 `click`。根游戏区域用 `touch-action: manipulation` 并阻止默认 `dblclick`，保留两次游戏输入但不触发页面放大；滚动层恢复 `pan-y pinch-zoom`。所有可见文案经过 `t()`，支持 zh/en。音频在首次手势后解锁，失败时静默降级，不参与权威状态更新。
 
-游戏没有自有玩法后台、排行榜、头像或微信权限依赖。Pages 是同 commit 的静态镜像；正式主地址由平台 UUID 子路径提供。
+游戏没有自有玩法后台、头像或微信权限依赖。核心引擎只接收 `ProgressRepository`，不导入 Aigram；`PlatformServices` 在入口组合本地仓库与可选平台能力。没有有效宿主身份时 `leaderboard` 为 `null`，榜首入口和榜单完全不渲染；移除 `src/platform/` 并改为 `LocalProgressRepository` 后仍可完整运行。Aigram 环境按当前游戏 UUID 提交总绣艺分、展示榜首/完整榜单/自己标记，并只向本次刚超过的最高分用户发送 `score_beat`。Pages 仍是同 commit 的静态前端镜像，默认退化为本地存档且无榜单。
 
 ## 4. 扩展点
 
@@ -99,5 +109,7 @@ _qa/
 - **调整颜色和符号**：编辑 `palette.ts`；逐关源色仍由生成器输出。
 - **调整精灵、拆线或回收演出**：编辑 `renderer.ts` 的任务时间与绘制函数；必须复验行走、异步回收和最密关性能。
 - **调整布局、图鉴或结算**：编辑 `styles.css` 与 `ui/view.ts`，复验两种目标视口和 44px 触控门禁。
+- **更换/移除排行榜平台**：实现 `platform/contracts.ts` 的端口并只修改 `create-platform-services.ts`；引擎和关卡无需改动。
+- **调整存档字段与积分**：修改 `progress.ts` 的 schema/归一化/计分函数，并同步 `engine.ts` 的稳定节点快照；升级版本时必须保留旧最高关迁移。
 - **修改音效/语言**：分别编辑 `audio.ts`、`i18n.ts`。
 - **接入后台或分享**：新建独立模块并重新执行 API base、凭据、存储与双部署审计；核心玩法不得依赖头像权限。

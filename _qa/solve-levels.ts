@@ -45,7 +45,7 @@ function select(input: SearchState, column: number) {
   const state = cloneState(input)
   const spool = state.columns[column].shift()
   if (!spool || state.slots.length >= 5) return null
-  state.slots.push({ slotId: ++state.sequence, spool, state: 'waiting' })
+  state.slots.push({ slotId: ++state.sequence, sourceColumn: column, spool, state: 'waiting' })
   return settle(state)
 }
 

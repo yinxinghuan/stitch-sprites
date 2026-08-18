@@ -1,11 +1,13 @@
 import { GameAudio } from './audio'
 import { createCells, createColumns, LEVELS } from './levels'
+import { PROGRESS_VERSION, scoreLevel, totalMastery, type PersistedProgress, type ProgressRepository, type StableRunState } from './progress'
 import { chooseReachableCell, createWalkPathfinder, findReachable, reachableColors } from './reachability'
 import type { ActiveSlot, GameSnapshot, LevelDefinition, SpoolState, StitchTask, ThreadColor } from './types'
 
 interface EngineHooks {
   onChange: (snapshot: GameSnapshot) => void
   onTasks: (tasks: StitchTask[]) => void
+  onMastery: (score: number, previousScore: number) => void
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -30,12 +32,24 @@ export class GameEngine {
   private busy = false
   private generation = 0
   private arrivalEmitTimer = 0
+  private wrongDispatches = 0
+  private maxSlotsUsed = 0
+  private usedHelp = false
+  private tutorialRescueUsed = false
+  private progress: PersistedProgress
+  private hasPlayerAction = false
+  private readonly queryLevel: number | null
 
-  constructor(private readonly hooks: EngineHooks) {
-    const queryLevel = Number(new URLSearchParams(location.search).get('level'))
-    const savedLevel = Number(alteruLocalStorage.getItem('stitch_sprites_level') ?? '1')
-    const requested = Number.isFinite(queryLevel) && queryLevel > 0 ? queryLevel : savedLevel
-    this.loadLevel(Math.max(0, Math.min(LEVELS.length - 1, requested - 1)))
+  constructor(private readonly hooks: EngineHooks, private readonly repository: ProgressRepository) {
+    const rawQueryLevel = Number(new URLSearchParams(location.search).get('level'))
+    this.queryLevel = Number.isFinite(rawQueryLevel) && rawQueryLevel > 0 ? rawQueryLevel : null
+    this.progress = repository.loadLocal()
+    const savedRun = this.queryLevel === null ? this.progress.currentRun : null
+    if (savedRun && savedRun.levelId <= this.progress.unlockedLevel) this.restoreRun(savedRun)
+    else {
+      const requested = this.queryLevel ?? this.progress.unlockedLevel
+      this.loadLevel(Math.max(0, Math.min(LEVELS.length - 1, requested - 1)), false)
+    }
   }
 
   get snapshot(): GameSnapshot {
@@ -51,54 +65,98 @@ export class GameEngine {
       remaining,
       reachable,
       messageKey: this.messageKey,
+      wrongDispatches: this.wrongDispatches,
+      usedHelp: this.usedHelp,
+      levelScore: scoreLevel(this.level.id, this.wrongDispatches, this.usedHelp),
+      totalMastery: totalMastery(this.progress),
     }
   }
 
   get unlockedLevel(): number {
-    return Math.max(1, Math.min(LEVELS.length, Number(alteruLocalStorage.getItem('stitch_sprites_level') ?? '1') || 1))
+    return this.progress.unlockedLevel
+  }
+
+  get persistedProgress(): PersistedProgress {
+    return structuredClone(this.progress)
   }
 
   canSelectColumn(index: number): boolean {
     if (this.phase !== 'playing' || this.slots.length >= 5) return false
     const spool = this.columns[index]?.[0]
     if (!spool) return false
-    if (!this.level.tutorial) return true
-    if (this.removed === 0) return index === 0
-    const colors = reachableColors(this.cells, findReachable(this.cells))
-    return colors.has(spool.color)
+    return !(this.level.id === 1 && this.removed === 0 && index !== 0)
   }
 
   async selectColumn(index: number): Promise<void> {
     if (!this.canSelectColumn(index)) return
+    const reachable = reachableColors(this.cells, findReachable(this.cells))
     const spool = this.columns[index].shift()
     if (!spool) return
+    const wrongDispatch = !reachable.has(spool.color)
+    this.hasPlayerAction = true
     this.audio.spool()
-    this.slots.push({ slotId: ++this.slotSequence, spool, state: 'waiting' })
-    if (this.removed === 0) this.messageKey = 'hint.first'
+    this.slots.push({ slotId: ++this.slotSequence, sourceColumn: index, spool, state: 'waiting' })
+    this.maxSlotsUsed = Math.max(this.maxSlotsUsed, this.slots.length)
+    if (wrongDispatch) {
+      this.wrongDispatches += 1
+      this.messageKey = 'hint.wait'
+      this.audio.wait()
+    } else if (this.removed === 0) this.messageKey = 'hint.first'
     this.emit()
     window.requestAnimationFrame(() => void this.processWork())
   }
 
   restart(): void {
+    this.hasPlayerAction = true
     this.audio.spool()
     this.loadLevel(this.levelIndex)
   }
 
   next(): void {
+    this.hasPlayerAction = true
     const nextIndex = (this.levelIndex + 1) % LEVELS.length
     this.loadLevel(nextIndex)
   }
 
   openLevel(levelId: number): void {
     if (!Number.isInteger(levelId) || levelId < 1 || levelId > this.unlockedLevel) return
+    this.hasPlayerAction = true
     this.loadLevel(levelId - 1)
+  }
+
+  applyMergedProgress(progress: PersistedProgress): void {
+    if (this.hasPlayerAction) {
+      this.progress = {
+        ...this.progress,
+        ...progress,
+        unlockedLevel: Math.max(this.progress.unlockedLevel, progress.unlockedLevel),
+        bestByLevel: Object.fromEntries(
+          [...new Set([...Object.keys(this.progress.bestByLevel), ...Object.keys(progress.bestByLevel)])]
+            .map((levelId) => [levelId, Math.max(this.progress.bestByLevel[levelId] ?? 0, progress.bestByLevel[levelId] ?? 0)]),
+        ),
+      }
+      this.persistStable(this.phase === 'complete')
+      return
+    }
+    this.progress = progress
+    const savedRun = this.queryLevel === null ? progress.currentRun : null
+    if (savedRun && savedRun.levelId <= progress.unlockedLevel) this.restoreRun(savedRun)
+    else {
+      const requested = this.queryLevel ?? progress.unlockedLevel
+      this.loadLevel(Math.max(0, Math.min(LEVELS.length - 1, requested - 1)), false)
+    }
+    this.persistStable()
+  }
+
+  finalizeInitialProgress(): void {
+    if (!this.progress.currentRun || this.queryLevel !== null) this.persistStable()
   }
 
   currentNeededColors(): ThreadColor[] {
     return [...reachableColors(this.cells, findReachable(this.cells))]
   }
 
-  private loadLevel(index: number): void {
+  private loadLevel(index: number, persist = true): void {
     if (this.arrivalEmitTimer) window.clearTimeout(this.arrivalEmitTimer)
     this.arrivalEmitTimer = 0
     this.generation += 1
@@ -112,7 +170,72 @@ export class GameEngine {
     this.messageKey = this.level.tutorial ? 'hint.start' : 'hint.normal'
     this.slotSequence = 0
     this.busy = false
+    this.wrongDispatches = 0
+    this.maxSlotsUsed = 0
+    this.usedHelp = false
+    this.tutorialRescueUsed = false
+    if (persist) this.persistStable()
     this.emit()
+  }
+
+  private restoreRun(run: StableRunState): void {
+    const level = LEVELS[run.levelId - 1]
+    this.generation += 1
+    this.levelIndex = run.levelId - 1
+    this.level = level
+    this.cells = createCells(level)
+    const cols = this.cells[0]?.length ?? 0
+    run.cleared.forEach((index) => {
+      const row = Math.floor(index / cols)
+      const col = index % cols
+      const cell = this.cells[row]?.[col]
+      if (cell?.color) cell.cleared = true
+    })
+    this.columns = structuredClone(run.columns)
+    this.slots = structuredClone(run.slots).map((slot) => ({ ...slot, state: 'waiting' }))
+    this.phase = run.phase
+    this.removed = run.removed
+    this.messageKey = run.phase === 'failed' ? 'hint.danger' : 'hint.resume'
+    this.slotSequence = run.slotSequence
+    this.wrongDispatches = run.wrongDispatches
+    this.maxSlotsUsed = run.maxSlotsUsed
+    this.usedHelp = run.usedHelp
+    this.tutorialRescueUsed = run.tutorialRescueUsed
+    this.busy = false
+    this.emit()
+    if (this.phase === 'playing' && this.slots.length) window.requestAnimationFrame(() => void this.processWork())
+  }
+
+  private stableRun(): StableRunState {
+    const cols = this.cells[0]?.length ?? 0
+    const cleared: number[] = []
+    this.cells.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+      if (cell.cleared) cleared.push(rowIndex * cols + colIndex)
+    }))
+    return {
+      levelId: this.level.id,
+      phase: this.phase === 'complete' ? 'playing' : this.phase,
+      cleared,
+      columns: structuredClone(this.columns),
+      slots: structuredClone(this.slots).map((slot) => ({ ...slot, state: 'waiting' })),
+      removed: this.removed,
+      slotSequence: this.slotSequence,
+      wrongDispatches: this.wrongDispatches,
+      maxSlotsUsed: this.maxSlotsUsed,
+      usedHelp: this.usedHelp,
+      tutorialRescueUsed: this.tutorialRescueUsed,
+    }
+  }
+
+  private persistStable(clearRun = false): void {
+    if (this.queryLevel !== null) return
+    this.progress = {
+      ...this.progress,
+      version: PROGRESS_VERSION,
+      updatedAt: Date.now(),
+      currentRun: clearRun ? null : this.stableRun(),
+    }
+    this.repository.save(this.progress)
   }
 
   private emit(): void {
@@ -189,12 +312,29 @@ export class GameEngine {
         if (this.slots.length >= 4) this.messageKey = this.slots.length === 5 ? 'hint.danger' : 'hint.wait'
         this.emit()
         if (this.slots.length >= 5 && this.snapshot.remaining > 0) {
-          this.phase = 'failed'
-          this.audio.fail()
-          this.emit()
+          if (this.level.tutorial && !this.tutorialRescueUsed) {
+            this.messageKey = 'hint.tutorialRescue'
+            this.audio.wait()
+            this.emit()
+            await delay(650)
+            if (runGeneration !== this.generation) return
+            const rescued = this.slots.pop()
+            if (rescued) this.columns[rescued.sourceColumn].unshift(rescued.spool)
+            this.tutorialRescueUsed = true
+            this.usedHelp = true
+            this.messageKey = 'hint.tutorialRescued'
+            this.persistStable()
+            this.emit()
+          } else {
+            this.phase = 'failed'
+            this.audio.fail()
+            this.persistStable()
+            this.emit()
+          }
         } else if (introducedWaiting) {
           this.audio.wait()
         }
+        this.persistStable()
         break
       }
 
@@ -225,12 +365,30 @@ export class GameEngine {
       const remaining = this.snapshot.remaining
       if (remaining === 0) {
         this.phase = 'complete'
-        const unlockedLevel = Math.max(this.unlockedLevel, Math.min(LEVELS.length, this.levelIndex + 2))
-        alteruLocalStorage.setItem('stitch_sprites_level', String(unlockedLevel))
+        if (this.queryLevel !== null) {
+          this.audio.complete()
+          this.emit()
+          break
+        }
+        const previousScore = totalMastery(this.progress)
+        const levelScore = scoreLevel(this.level.id, this.wrongDispatches, this.usedHelp)
+        const bestByLevel = {
+          ...this.progress.bestByLevel,
+          [String(this.level.id)]: Math.max(this.progress.bestByLevel[String(this.level.id)] ?? 0, levelScore),
+        }
+        this.progress = {
+          ...this.progress,
+          unlockedLevel: Math.max(this.unlockedLevel, Math.min(LEVELS.length, this.levelIndex + 2)),
+          bestByLevel,
+        }
+        this.persistStable(true)
         this.audio.complete()
         this.emit()
+        const nextScore = totalMastery(this.progress)
+        if (nextScore > previousScore) this.hooks.onMastery(nextScore, previousScore)
         break
       }
+      this.persistStable()
       this.emit()
     }
 

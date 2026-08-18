@@ -3,7 +3,23 @@ import { LEVELS } from '../game/levels'
 import type { GameEngine } from '../game/engine'
 import type { GameSnapshot, LevelDefinition, SpoolState, ThreadColor } from '../game/types'
 import { t } from '../i18n'
-import { arrowIcon, closeIcon, galleryIcon, restartIcon, soundIcon } from './icons'
+import type { LeaderboardEntry, LeaderboardService } from '../platform/contracts'
+import { arrowIcon, closeIcon, galleryIcon, rankIcon, restartIcon, soundIcon } from './icons'
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[character] ?? character)
+}
+
+function safeAvatar(value: string): string {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? escapeHtml(url.href) : ''
+  } catch {
+    return ''
+  }
+}
 
 export class GameView {
   readonly canvas: HTMLCanvasElement
@@ -16,8 +32,11 @@ export class GameView {
   private readonly soundButton: HTMLButtonElement
   private readonly restartButton: HTMLButtonElement
   private readonly headingButton: HTMLButtonElement
+  private readonly championButton: HTMLButtonElement | null
   private galleryOpen = false
-  constructor(root: HTMLElement) {
+  private leaderboardOpen = false
+  private leaderboardRows: LeaderboardEntry[] = []
+  constructor(root: HTMLElement, private readonly leaderboard: LeaderboardService | null) {
     root.innerHTML = `
       <div class="ss-app">
         <header class="ss-header">
@@ -35,6 +54,7 @@ export class GameView {
         <section class="ss-board" aria-label="${t('game.title')}">
           <canvas class="ss-board__canvas" role="img"></canvas>
           <div class="ss-board__portal" aria-hidden="true"><span></span><span></span></div>
+          ${leaderboard ? `<button class="ss-champion" type="button" aria-label="${t('action.rank')}">${rankIcon}<span>${t('action.rank')}</span></button>` : ''}
         </section>
         <section class="ss-rack" aria-label="reel rack"><div class="ss-slots"></div></section>
         <section class="ss-tray" aria-label="thread reels"></section>
@@ -52,6 +72,8 @@ export class GameView {
     this.soundButton = root.querySelector('.ss-sound')!
     this.restartButton = root.querySelector('.ss-restart')!
     this.headingButton = root.querySelector('.ss-heading')!
+    this.championButton = root.querySelector('.ss-champion')
+    root.addEventListener('dblclick', (event) => event.preventDefault(), { passive: false })
   }
 
   bind(engine: GameEngine): void {
@@ -68,7 +90,14 @@ export class GameView {
     this.restartButton.addEventListener('click', () => engine.restart())
     this.headingButton.addEventListener('click', () => {
       this.galleryOpen = true
+      this.leaderboardOpen = false
       this.renderOverlay(engine.snapshot, engine)
+    })
+    this.championButton?.addEventListener('click', () => {
+      this.leaderboardOpen = true
+      this.galleryOpen = false
+      this.renderOverlay(engine.snapshot, engine)
+      void this.refreshLeaderboard(engine)
     })
     window.addEventListener('keydown', (event) => {
       if (event.key.toLowerCase() === 'r') engine.restart()
@@ -76,6 +105,14 @@ export class GameView {
       if (index >= 0 && index < 4) void engine.selectColumn(index)
     })
     this.renderSound(engine)
+    void this.refreshLeaderboard(engine)
+  }
+
+  async refreshLeaderboard(engine: GameEngine): Promise<void> {
+    if (!this.leaderboard) return
+    this.leaderboardRows = await this.leaderboard.fetch()
+    this.renderChampion()
+    if (this.leaderboardOpen) this.renderOverlay(engine.snapshot, engine)
   }
 
   update(snapshot: GameSnapshot, engine: GameEngine): void {
@@ -94,6 +131,20 @@ export class GameView {
   private renderSound(engine: GameEngine): void {
     this.soundButton.innerHTML = soundIcon(engine.audio.isMuted)
     this.soundButton.setAttribute('aria-label', t(engine.audio.isMuted ? 'action.soundOn' : 'action.soundOff'))
+  }
+
+  private renderChampion(): void {
+    if (!this.championButton) return
+    const champion = this.leaderboardRows[0]
+    if (!champion) {
+      this.championButton.innerHTML = `${rankIcon}<span>${t('action.rank')}</span>`
+      return
+    }
+    const avatar = safeAvatar(champion.avatarUrl)
+    const avatarMarkup = avatar
+      ? `<img src="${avatar}" alt="" draggable="false" />`
+      : `<span class="ss-champion__initial" aria-hidden="true">${escapeHtml(champion.name.slice(0, 1).toUpperCase() || '?')}</span>`
+    this.championButton.innerHTML = `${rankIcon}${avatarMarkup}<strong>${champion.score.toLocaleString()}</strong>`
   }
 
   private renderSlots(snapshot: GameSnapshot): void {
@@ -164,6 +215,10 @@ export class GameView {
   }
 
   private renderOverlay(snapshot: GameSnapshot, engine: GameEngine): void {
+    if (this.leaderboardOpen) {
+      this.renderLeaderboard(snapshot, engine)
+      return
+    }
     if (this.galleryOpen) {
       this.renderGallery(engine)
       return
@@ -182,6 +237,7 @@ export class GameView {
             <span class="ss-result__eyebrow">${t('complete.title')}</span>
             <p>${t('complete.reveal')}</p>
             <h2>${t(snapshot.level.completeKey)}</h2>
+            <small class="ss-result__mastery">${t('complete.score', { n: snapshot.levelScore })} · ${t('complete.totalScore', { n: snapshot.totalMastery })}</small>
           </div>
           <button class="ss-primary" type="button">${snapshot.level.id < LEVELS.length ? t('action.next') : t('action.gallery')} ${snapshot.level.id < LEVELS.length ? arrowIcon : galleryIcon}</button>
         </div>
@@ -209,6 +265,42 @@ export class GameView {
       `
       this.overlay.querySelector('button')?.addEventListener('click', () => engine.restart(), { once: true })
     }
+  }
+
+  private renderLeaderboard(snapshot: GameSnapshot, engine: GameEngine): void {
+    const rows = this.leaderboardRows
+    this.overlay.hidden = false
+    this.overlay.innerHTML = `
+      <div class="ss-leaderboard" role="dialog" aria-modal="true" aria-label="${t('rank.title')}">
+        <header class="ss-leaderboard__header">
+          <div><span>${t('rank.kicker')}</span><h2>${t('rank.title')}</h2></div>
+          <button class="ss-leaderboard__close ss-icon-button" type="button" aria-label="${t('action.close')}">${closeIcon}</button>
+        </header>
+        <div class="ss-leaderboard__list">
+          ${rows.length ? rows.map((row) => {
+            const avatar = safeAvatar(row.avatarUrl)
+            const avatarMarkup = avatar
+              ? `<img src="${avatar}" alt="" draggable="false" />`
+              : `<span class="ss-rank-row__initial" aria-hidden="true">${escapeHtml(row.name.slice(0, 1).toUpperCase() || '?')}</span>`
+            return `<button class="ss-rank-row ${row.isMe ? 'ss-rank-row--me' : ''}" type="button" data-user-id="${escapeHtml(row.userId)}" ${row.isMe ? 'disabled' : ''}>
+              <span class="ss-rank-row__rank">${row.rank || '—'}</span>${avatarMarkup}
+              <span class="ss-rank-row__name">${escapeHtml(row.name)}${row.isMe ? ` <small>${t('rank.me')}</small>` : ''}</span>
+              <strong>${t('rank.score', { n: row.score.toLocaleString() })}</strong>
+            </button>`
+          }).join('') : `<p class="ss-leaderboard__empty">${t('rank.empty')}</p>`}
+        </div>
+      </div>
+    `
+    this.overlay.querySelector('.ss-leaderboard__close')?.addEventListener('click', () => {
+      this.leaderboardOpen = false
+      this.renderOverlay(snapshot, engine)
+    }, { once: true })
+    this.overlay.querySelectorAll<HTMLButtonElement>('.ss-rank-row:not(:disabled)').forEach((button) => {
+      button.addEventListener('click', () => {
+        const userId = button.dataset.userId
+        if (userId) this.leaderboard?.openProfile(userId)
+      })
+    })
   }
 
   private renderGallery(engine: GameEngine): void {
