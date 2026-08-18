@@ -97,7 +97,7 @@ _qa/
 
 ### UI、输入、音频与 i18n
 
-`GameView` 渲染 HUD、五槽、四列牌、绣品册、结果层和可选榜单。游戏牌用 `pointerdown`；可滚动绣品册和榜单使用 `click`。根游戏区域用 `touch-action: manipulation` 并阻止默认 `dblclick`，保留两次游戏输入但不触发页面放大；滚动层恢复 `pan-y pinch-zoom`。所有可见文案经过 `t()`，支持 zh/en。音频在首次手势后解锁，失败时静默降级，不参与权威状态更新。
+`GameView` 渲染紧凑 HUD、五槽、四列牌、绣品册、结果层和可选榜单。绣品册打开时按已解锁最高关缓存其 DOM，不因引擎动画帧重复重建而改变 `scrollTop`；未解锁卡片只渲染编号与锁，不创建图案 Canvas。游戏牌用 `pointerdown`；可滚动绣品册和榜单使用 `click`。根游戏区域用 `touch-action: manipulation` 并阻止默认 `dblclick`，保留两次游戏输入但不触发页面放大；滚动层恢复 `pan-y pinch-zoom`。所有可见文案经过 `t()`，支持 zh/en。音频在首次手势后解锁，失败时静默降级，不参与权威状态更新。
 
 游戏没有自有玩法后台、头像或微信权限依赖。核心引擎只接收 `ProgressRepository`，不导入 Aigram；`PlatformServices` 在入口组合本地仓库与可选平台能力。没有有效宿主身份时 `leaderboard` 为 `null`，榜首入口和榜单完全不渲染；移除 `src/platform/` 并改为 `LocalProgressRepository` 后仍可完整运行。Aigram 环境按当前游戏 UUID 提交总绣艺分、展示榜首/完整榜单/自己标记，并只向本次刚超过的最高分用户发送 `score_beat`。Pages 仍是同 commit 的静态前端镜像，默认退化为本地存档且无榜单。
 

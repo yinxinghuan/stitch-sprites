@@ -4,7 +4,7 @@ import type { GameEngine } from '../game/engine'
 import type { GameSnapshot, LevelDefinition, SpoolState, ThreadColor } from '../game/types'
 import { t } from '../i18n'
 import type { LeaderboardEntry, LeaderboardService } from '../platform/contracts'
-import { arrowIcon, closeIcon, galleryIcon, rankIcon, restartIcon, soundIcon } from './icons'
+import { arrowIcon, closeIcon, galleryIcon, lockIcon, rankIcon, restartIcon, soundIcon } from './icons'
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => ({
@@ -34,6 +34,7 @@ export class GameView {
   private readonly headingButton: HTMLButtonElement
   private readonly championButton: HTMLButtonElement | null
   private galleryOpen = false
+  private galleryRenderedUnlocked = -1
   private leaderboardOpen = false
   private leaderboardRows: LeaderboardEntry[] = []
   constructor(root: HTMLElement, private readonly leaderboard: LeaderboardService | null) {
@@ -41,11 +42,11 @@ export class GameView {
       <div class="ss-app">
         <header class="ss-header">
           <button class="ss-heading" type="button">
-            <span class="ss-kicker">${t('game.title')}</span>
-            <span class="ss-heading__line"><span class="ss-level"></span>${galleryIcon}</span>
+            <span class="ss-level"></span>${galleryIcon}
           </button>
           <div class="ss-header__actions">
             <span class="ss-remaining"></span>
+            ${leaderboard ? `<button class="ss-champion ss-icon-button" type="button" aria-label="${t('action.rank')}">${rankIcon}</button>` : ''}
             <button class="ss-restart ss-icon-button" type="button">${restartIcon}</button>
             <button class="ss-icon-button ss-sound" type="button"></button>
           </div>
@@ -54,7 +55,6 @@ export class GameView {
         <section class="ss-board" aria-label="${t('game.title')}">
           <canvas class="ss-board__canvas" role="img"></canvas>
           <div class="ss-board__portal" aria-hidden="true"><span></span><span></span></div>
-          ${leaderboard ? `<button class="ss-champion" type="button" aria-label="${t('action.rank')}">${rankIcon}<span>${t('action.rank')}</span></button>` : ''}
         </section>
         <section class="ss-rack" aria-label="reel rack"><div class="ss-slots"></div></section>
         <section class="ss-tray" aria-label="thread reels"></section>
@@ -116,7 +116,7 @@ export class GameView {
   }
 
   update(snapshot: GameSnapshot, engine: GameEngine): void {
-    this.levelLabel.textContent = `${snapshot.level.id} · ${t(snapshot.level.titleKey)}`
+    this.levelLabel.textContent = String(snapshot.level.id).padStart(2, '0')
     this.remainingLabel.textContent = t('hud.remaining', { n: snapshot.remaining })
     this.message.textContent = t(snapshot.messageKey)
     this.canvas.setAttribute('aria-label', `${t(snapshot.level.titleKey)}，${t('hud.remaining', { n: snapshot.remaining })}`)
@@ -137,14 +137,23 @@ export class GameView {
     if (!this.championButton) return
     const champion = this.leaderboardRows[0]
     if (!champion) {
-      this.championButton.innerHTML = `${rankIcon}<span>${t('action.rank')}</span>`
+      this.championButton.innerHTML = rankIcon
+      this.championButton.setAttribute('aria-label', t('action.rank'))
       return
     }
+    const characters = Array.from(champion.name.trim())
+    const limit = /\p{Script=Han}/u.test(champion.name) ? 2 : 3
+    const initials = characters.slice(0, limit).join('').toUpperCase() || '?'
     const avatar = safeAvatar(champion.avatarUrl)
-    const avatarMarkup = avatar
+    const identity = avatar
       ? `<img src="${avatar}" alt="" draggable="false" />`
-      : `<span class="ss-champion__initial" aria-hidden="true">${escapeHtml(champion.name.slice(0, 1).toUpperCase() || '?')}</span>`
-    this.championButton.innerHTML = `${rankIcon}${avatarMarkup}<strong>${champion.score.toLocaleString()}</strong>`
+      : `<span class="ss-champion__initial">${escapeHtml(initials)}</span>`
+    const compactScore = new Intl.NumberFormat(undefined, {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(champion.score)
+    this.championButton.innerHTML = `${rankIcon}${identity}<strong>${escapeHtml(compactScore)}</strong>`
+    this.championButton.setAttribute('aria-label', `${t('action.rank')} · ${champion.name} · ${champion.score.toLocaleString()}`)
   }
 
   private renderSlots(snapshot: GameSnapshot): void {
@@ -226,6 +235,7 @@ export class GameView {
     if (snapshot.phase === 'playing') {
       this.overlay.hidden = true
       this.overlay.innerHTML = ''
+      this.galleryRenderedUnlocked = -1
       return
     }
     this.overlay.hidden = false
@@ -304,6 +314,11 @@ export class GameView {
   }
 
   private renderGallery(engine: GameEngine): void {
+    if (this.galleryRenderedUnlocked === engine.unlockedLevel && this.overlay.querySelector('.ss-gallery')) {
+      this.overlay.hidden = false
+      return
+    }
+    const previousScroll = this.overlay.querySelector<HTMLElement>('.ss-gallery__scroll')?.scrollTop ?? 0
     const colorCount = (level: LevelDefinition): number => new Set(level.rows.join('').replaceAll('.', '')).size
     const chapters = [2, 3, 4, 5, 6].map((count) => ({
       key: `chapter.colors${count}`,
@@ -326,8 +341,8 @@ export class GameView {
                   const colors = colorCount(level)
                   return `
                     <button class="ss-gallery-card ${unlocked ? '' : 'ss-gallery-card--locked'}" type="button" data-level="${level.id}" ${unlocked ? '' : 'disabled'}>
-                      <span class="ss-gallery-card__icon" aria-hidden="true"><canvas class="ss-pattern-thumb" data-pattern-level="${level.id}"></canvas></span>
-                      <span class="ss-gallery-card__copy"><strong>${level.id} · ${t(level.titleKey)}</strong><small>${unlocked ? t('gallery.colors', { n: colors }) : t('gallery.locked')}</small></span>
+                      <span class="ss-gallery-card__icon" aria-hidden="true">${unlocked ? `<canvas class="ss-pattern-thumb" data-pattern-level="${level.id}"></canvas>` : lockIcon}</span>
+                      <span class="ss-gallery-card__copy"><strong>${unlocked ? `${level.id} · ${t(level.titleKey)}` : String(level.id).padStart(2, '0')}</strong>${unlocked ? `<small>${t('gallery.colors', { n: colors })}</small>` : ''}</span>
                     </button>
                   `
                 }).join('')}
@@ -337,7 +352,10 @@ export class GameView {
         </div>
       </div>
     `
+    this.galleryRenderedUnlocked = engine.unlockedLevel
     this.paintPatternCanvases()
+    const scroll = this.overlay.querySelector<HTMLElement>('.ss-gallery__scroll')
+    if (scroll) scroll.scrollTop = previousScroll
     this.overlay.querySelector('.ss-gallery__close')?.addEventListener('click', () => {
       this.galleryOpen = false
       this.renderOverlay(engine.snapshot, engine)
