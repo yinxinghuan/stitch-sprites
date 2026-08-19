@@ -8,7 +8,7 @@ Levels 1–7 are the user-selected onboarding set. Six- and seven-color chapters
 | 2 | `spellbook` | 3 | 2 | 591 | 1977 |
 | 3 | `slime` | 3 | 1 | 254 | 1580 |
 | 4 | `suitcase` | 4 | 2 | 598 | 3534 |
-| 5 | `potion` | 5 | 1 | 204 | 1365 |
+| 5 | `potion` | 4 | 1 | 202 | 1365 |
 | 6 | `lighthouse` | 5 | 2 | 597 | 3306 |
 | 7 | `alteruBloom` | 5 | 1 | 1836 | 4035 |
 | 8 | `deskFan` | 6 | 6 | 1151 | 3232 |

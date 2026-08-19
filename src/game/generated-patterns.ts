@@ -280,10 +280,10 @@ export const GENERATED_PATTERNS: GeneratedPattern[] = [
   },
   {
     key: 'potion',
-    colorCount: 5, exposedColorCount: 1, transitions: 204, stitchCount: 1365,
-    palette: { R: '#a74650', Y: '#eea730', G: '#429e48', B: '#427a9e', P: '#7246a7', K: '#2e2e39' },
-    columns: [[['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 48], ['B', 1], ['K', 5]], [['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['P', 55], ['G', 55], ['G', 55], ['G', 55], ['Y', 24]], [['Y', 55], ['Y', 55]], [['Y', 55], ['Y', 12], ['G', 55], ['G', 55], ['G', 10], ['K', 55]]],
-    solution: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 2, 3, 2, 3, 1, 3, 1, 3, 1, 3, 0, 3, 0, 1],
+    colorCount: 4, exposedColorCount: 1, transitions: 202, stitchCount: 1365,
+    palette: { R: '#a74650', Y: '#eea730', G: '#429e48', B: '#42559e', P: '#7246a7', K: '#2e2e39' },
+    columns: [[['P', 65], ['P', 65], ['P', 65], ['P', 65], ['P', 65], ['P', 65], ['P', 38], ['K', 60]], [['P', 65], ['P', 65], ['P', 65], ['P', 65], ['P', 65], ['P', 65], ['G', 65], ['G', 65], ['G', 26]], [['Y', 65], ['Y', 47]], [['Y', 65], ['G', 65], ['G', 65], ['Y', 24]]],
+    solution: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 2, 3, 2, 1, 3, 1, 3, 1, 0, 3],
     rows: [
     '.............PPPPPPPPPPPPPP.............',
     '............PPPPPPPPPPPPPPPP............',
@@ -319,7 +319,7 @@ export const GENERATED_PATTERNS: GeneratedPattern[] = [
     '.PPPPP.PPYGGYGGGY.YYYY.YYY.YY..PP.PPPP..',
     'PPPPPP.PPGGGGGGGGYY......YYY...PP.PPPPPP',
     'PPPPPP.PGGGGGGGGGGGGYY.YYYYYYY.PP.PPPPPP',
-    'PPPPPP.BGGGGGGGGGGGGGGYY.YYYYYGPP.PPPPPP',
+    'PPPPPP.GGGGGGGGGGGGGGGYY.YYYYYGPP.PPPPPP',
     'PPPPPP.GGGGGYGGGGGGGGGGG.YYY..GG..PPPPPP',
     'PPPPPP.GGGGGYGGGGGGYYGGGGYYYYGGGYYPPPPPP',
     'PPPPPP.GGGYYYYYGGGGYYGGGGGGGGGGGY.PPPPPP',

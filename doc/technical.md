@@ -98,7 +98,7 @@ _qa/
 
 ### 渲染与性能
 
-`BoardRenderer` 使用三层 Canvas：
+`BoardRenderer` 使用三层 Canvas。每次载入、重开或恢复都会提升 `runRevision`；即使仍是同一关，revision 改变也会清除旧精灵任务与静态清除缓存，强制重绘完整棋盘，避免“槽位清空但针脚仍保持拆除”的假重开。
 
 - `baseCanvas`：木绷和织物，只在尺寸/关卡变化时重画。
 - `staticCanvas`：源十字绣纹理按未清除格的 `Path2D` 遮罩绘制；清除时只从底层回填对应格。

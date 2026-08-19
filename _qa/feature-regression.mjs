@@ -11,6 +11,8 @@ const headerOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui
 const narrowHeaderOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui', 'feature-social-save-platform-header-320x568.png')
 const galleryOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui', 'feature-social-save-gallery-locks-390x844.png')
 const narrowGalleryOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui', 'feature-social-save-gallery-locks-320x568.png')
+const restartInitialOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui', 'feature-restart-initial-390x844.png')
+const restartRestoredOutput = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ui', 'feature-restart-restored-390x844.png')
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN' })
 await context.addInitScript(() => {
@@ -20,9 +22,72 @@ await context.addInitScript(() => {
 })
 
 const page = await context.newPage()
+const stableBoardCanvas = async (targetPage) => {
+  let previous = ''
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await targetPage.waitForTimeout(250)
+    const current = await targetPage.locator('.ss-board__canvas').evaluate((canvas) => {
+      const crop = document.createElement('canvas')
+      crop.width = canvas.width
+      crop.height = Math.floor(canvas.height * 0.9)
+      crop.getContext('2d')?.drawImage(
+        canvas,
+        0,
+        0,
+        crop.width,
+        crop.height,
+        0,
+        0,
+        crop.width,
+        crop.height,
+      )
+      return crop.toDataURL()
+    })
+    if (current === previous) return current
+    previous = current
+  }
+  return previous
+}
+const boardDifferenceRatio = async (targetPage, referenceDataUrl) => targetPage.locator('.ss-board__canvas').evaluate(async (canvas, reference) => {
+  const height = Math.floor(canvas.height * 0.9)
+  const current = document.createElement('canvas')
+  current.width = canvas.width
+  current.height = height
+  current.getContext('2d')?.drawImage(canvas, 0, 0, canvas.width, height, 0, 0, canvas.width, height)
+  const image = new Image()
+  image.src = reference
+  await image.decode()
+  const referenceCanvas = document.createElement('canvas')
+  referenceCanvas.width = canvas.width
+  referenceCanvas.height = height
+  referenceCanvas.getContext('2d')?.drawImage(image, 0, 0)
+  const currentPixels = current.getContext('2d')?.getImageData(0, 0, canvas.width, height).data ?? []
+  const referencePixels = referenceCanvas.getContext('2d')?.getImageData(0, 0, canvas.width, height).data ?? []
+  let materiallyDifferent = 0
+  for (let index = 0; index < currentPixels.length; index += 4) {
+    const difference = Math.max(
+      Math.abs(currentPixels[index] - referencePixels[index]),
+      Math.abs(currentPixels[index + 1] - referencePixels[index + 1]),
+      Math.abs(currentPixels[index + 2] - referencePixels[index + 2]),
+    )
+    if (difference > 90) materiallyDifferent += 1
+  }
+  return materiallyDifferent / Math.max(1, currentPixels.length / 4)
+}, referenceDataUrl)
 await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
 await page.addStyleTag({ content: '#alteru-guest-banner{display:none!important}' })
 await page.locator('.ss-app').waitFor({ state: 'visible' })
+const initialCanvas = await stableBoardCanvas(page)
+await page.locator('.ss-board__canvas').screenshot({ path: restartInitialOutput })
+await page.waitForFunction(() => {
+  const key = Object.keys(localStorage).find((candidate) => candidate.endsWith(':stitch_sprites_progress_v2'))
+  if (!key) return false
+  return Boolean(JSON.parse(localStorage.getItem(key) || 'null')?.currentRun)
+})
+const initialRun = await page.evaluate(() => {
+  const key = Object.keys(localStorage).find((candidate) => candidate.endsWith(':stitch_sprites_progress_v2'))
+  return key ? JSON.parse(localStorage.getItem(key) || 'null')?.currentRun : null
+})
 
 const initialSpools = await page.locator('.ss-spool').count()
 const initialEnabled = await page.locator('.ss-spool:not(:disabled)').count()
@@ -67,6 +132,27 @@ const resumedStorage = await page.evaluate(() => Object.fromEntries(Object.entri
 if (resumedLabel !== '01') throw new Error(`Reload did not resume level 1: ${resumedLabel} ${JSON.stringify(resumedStorage)}`)
 const resumedRemaining = Number((await page.locator('.ss-remaining').textContent())?.match(/\d+/)?.[0])
 if (!(resumedRemaining < initialRemaining)) throw new Error(`Reload did not restore cleared stitches: ${resumedRemaining}/${initialRemaining}`)
+
+await page.locator('.ss-restart').click()
+await page.waitForFunction((remaining) => {
+  const current = Number(document.querySelector('.ss-remaining')?.textContent?.match(/\d+/)?.[0])
+  return current === remaining && !document.querySelector('.ss-slot:not(.ss-slot--empty)')
+}, initialRemaining)
+const restartedCanvas = await stableBoardCanvas(page)
+await page.locator('.ss-board__canvas').screenshot({ path: restartRestoredOutput })
+const restartDifference = restartedCanvas === initialCanvas ? 0 : await boardDifferenceRatio(page, initialCanvas)
+if (restartDifference > 0.002) throw new Error(`Restart did not restore the complete initial board rendering: ${restartDifference}`)
+const restartedProgress = await page.evaluate(() => {
+  const key = Object.keys(localStorage).find((candidate) => candidate.endsWith(':stitch_sprites_progress_v2'))
+  return key ? JSON.parse(localStorage.getItem(key) || 'null') : null
+})
+if (restartedProgress?.currentRun?.removed !== 0 || restartedProgress.currentRun.cleared.length !== 0) {
+  throw new Error(`Restart left cleared stitches in the saved run: ${JSON.stringify(restartedProgress?.currentRun)}`)
+}
+if (JSON.stringify(restartedProgress.currentRun.columns) !== JSON.stringify(initialRun.columns)
+  || restartedProgress.currentRun.slots.length !== 0) {
+  throw new Error('Restart did not restore the initial spool order and five empty slots')
+}
 
 await page.locator('.ss-heading').click()
 await page.locator('.ss-gallery').waitFor({ state: 'visible' })
@@ -134,6 +220,6 @@ await platformPage.locator('.ss-champion').click()
 await platformPage.locator('.ss-leaderboard').waitFor({ state: 'visible' })
 await platformPage.screenshot({ path: narrowOutput })
 
-console.log(JSON.stringify({ ok: true, initialEnabled, doubleTapContract, savedLevel: stored.currentRun.levelId, savedRemoved: stored.currentRun.removed, platformLeaderboard: true }))
+console.log(JSON.stringify({ ok: true, initialEnabled, doubleTapContract, savedLevel: stored.currentRun.levelId, savedRemoved: stored.currentRun.removed, restartRestored: initialRemaining, restartDifference, platformLeaderboard: true }))
 await context.close()
 await browser.close()

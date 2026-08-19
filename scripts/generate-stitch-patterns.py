@@ -992,7 +992,12 @@ def main() -> None:
         tile = tile_crop(image, columns, rows, tile_index)
         source_tiles[key] = tile
         codes = classify_pixels(tile)
-        if not filename.startswith("chapter-seven"):
+        if key == "potion":
+            # The four-color source contains one anti-aliased aqua edge pixel
+            # inside the green liquid. Keep the approved legacy level genuinely
+            # four-color instead of inventing a one-stitch fifth reel.
+            codes[codes == ord("C")] = ord("G")
+        elif not filename.startswith("chapter-seven"):
             codes[codes == ord("C")] = ord("B")
         pattern, swatches, origin = extract_native_grid(tile, codes, pitch)
         remove_separator_artifacts(pattern)
@@ -1035,7 +1040,7 @@ def main() -> None:
             "spellbook": 3,
             "slime": 3,
             "suitcase": 4,
-            "potion": 5,
+            "potion": 4,
             "lighthouse": 5,
             "alteruBloom": 5,
         }

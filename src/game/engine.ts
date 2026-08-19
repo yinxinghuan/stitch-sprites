@@ -56,6 +56,7 @@ export class GameEngine {
     const reachable = findReachable(this.cells)
     const remaining = this.cells.flat().filter((cell) => cell.color && !cell.cleared).length
     return {
+      runRevision: this.generation,
       level: this.level,
       cells: this.cells,
       columns: this.columns,

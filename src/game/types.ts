@@ -50,6 +50,7 @@ export interface StitchTask {
 export type GamePhase = 'playing' | 'complete' | 'failed'
 
 export interface GameSnapshot {
+  runRevision: number
   level: LevelDefinition
   cells: Cell[][]
   columns: SpoolState[][]

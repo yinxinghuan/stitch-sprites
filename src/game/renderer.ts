@@ -85,10 +85,12 @@ export class BoardRenderer {
 
   setSnapshot(snapshot: GameSnapshot): void {
     const previous = this.snapshot
-    if (previous?.phase === 'playing' && snapshot.phase !== 'playing') this.missions = []
+    const runChanged = Boolean(previous && previous.runRevision !== snapshot.runRevision)
+    if (runChanged || (previous?.phase === 'playing' && snapshot.phase !== 'playing')) this.missions = []
     const canPatch = Boolean(
       previous
       && previous.level.id === snapshot.level.id
+      && previous.runRevision === snapshot.runRevision
       && previous.phase === 'playing'
       && snapshot.phase === 'playing'
       && !this.baseDirty
