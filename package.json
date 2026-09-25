@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:crazygames": "vite --mode crazygames",
     "build": "tsc -b && vite build",
+    "build:crazygames": "tsc -b && vite build --mode crazygames && node scripts/package-crazygames.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

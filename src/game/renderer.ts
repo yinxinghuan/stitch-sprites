@@ -45,6 +45,8 @@ export class BoardRenderer {
   private geometryCache: BoardGeometry | null = null
   private geometryKey = ''
   private destroyed = false
+  private clockPaused = false
+  private clockPausedAt = 0
   private resizeObserver: ResizeObserver
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   private readonly patternTextures = new Map<string, HTMLImageElement>()
@@ -141,6 +143,22 @@ export class BoardRenderer {
         threadRecoveryMs: 1160 + ((task.workerIndex * 7 + task.row * 3 + task.col) % 5) * 86,
       })
     })
+    this.requestDraw()
+  }
+
+  setClockPaused(paused: boolean): void {
+    if (paused) {
+      if (this.clockPaused) return
+      this.clockPaused = true
+      this.clockPausedAt = performance.now()
+      if (this.frame) cancelAnimationFrame(this.frame)
+      this.frame = 0
+      return
+    }
+    if (!this.clockPaused) return
+    const delta = performance.now() - this.clockPausedAt
+    this.missions.forEach((mission) => { mission.startedAt += delta })
+    this.clockPaused = false
     this.requestDraw()
   }
 
@@ -297,7 +315,7 @@ export class BoardRenderer {
 
   private draw(time: number): void {
     this.frame = 0
-    if (this.destroyed) return
+    if (this.destroyed || this.clockPaused) return
     const ctx = this.context
     if (this.staticDirty) this.redrawStatic()
     ctx.setTransform(1, 0, 0, 1, 0, 0)

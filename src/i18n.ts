@@ -438,6 +438,7 @@ const messages = {
 type MessageKey = keyof typeof messages.zh
 
 function detectLocale(): Locale {
+  if (import.meta.env.MODE === 'crazygames') return 'en'
   const override = alteruLocalStorage.getItem('game_locale')
   if (override === 'en' || override === 'zh') return override
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'

@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm run build:crazygames
+      - run: rm -rf dist/crazygames && mkdir -p dist/crazygames && cp -a dist-crazygames/. dist/crazygames/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

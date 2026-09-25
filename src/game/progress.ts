@@ -27,6 +27,7 @@ export interface StableRunState {
   maxSlotsUsed: number
   usedHelp: boolean
   tutorialRescueUsed: boolean
+  extraSlot?: boolean
 }
 
 export interface PersistedProgress {
