@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "screenshots": [
+    {
+      "viewport": "800x450",
+      "tutorialLayout": {
+        "enabled": [
+          "0"
+        ],
+        "clipped": [],
+        "overlap": 0,
+        "viewport": {
+          "width": 800,
+          "height": 450
+        },
+        "scroll": {
+          "width": 800,
+          "height": 450
+        }
+      },
+      "midState": {
+        "visibleMissionCount": 4,
+        "spools": [
+          {
+            "name": "red",
+            "count": "40",
+            "state": "READY"
+          },
+          {
+            "name": "green",
+            "count": "40",
+            "state": "READY"
+          },
+          {
+            "name": "green",
+            "count": "21",
+            "state": "READY"
+          },
+          {
+            "name": "red",
+            "count": "40",
+            "state": "READY"
+          }
+        ]
+      },
+      "firstTenDistinct": true,
+      "events": [
+        "init",
+        "loadingStart",
+        "loadingStop",
+        "gameplayStart",
+        "gameplayStop"
+      ],
+      "resultText": "PATTERN 1 CLEAR\n\nCrimson Kite is safely filed in the album\n\nPattern score 1,525 · album 1,525\n\nFinish the next pattern to open your coin purse.\n\nNext pattern: Moss Lantern.\n\nNext unlock: Recall, after pattern 2 (80 coins).\n\nNext pattern\nN\nAlbum"
+    }
+  ],
+  "firstTen": [],
+  "initialTransfer": {
+    "bytes": 0,
+    "files": [],
+    "requestedPatterns": []
+  }
+}

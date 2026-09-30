@@ -1,0 +1,166 @@
+{
+  "generator": "scripts/generate-crazygames-patterns.py",
+  "licence": "Original project artwork; no third-party source material.",
+  "patterns": [
+    {
+      "key": "ladybug",
+      "file": "ladybug.png"
+    },
+    {
+      "key": "spellbook",
+      "file": "spellbook.png"
+    },
+    {
+      "key": "slime",
+      "file": "slime.png"
+    },
+    {
+      "key": "suitcase",
+      "file": "suitcase.png"
+    },
+    {
+      "key": "potion",
+      "file": "potion.png"
+    },
+    {
+      "key": "lighthouse",
+      "file": "lighthouse.png"
+    },
+    {
+      "key": "deskFan",
+      "file": "deskFan.png"
+    },
+    {
+      "key": "rollerSkate",
+      "file": "rollerSkate.png"
+    },
+    {
+      "key": "hotAirBalloon",
+      "file": "hotAirBalloon.png"
+    },
+    {
+      "key": "espressoMachine",
+      "file": "espressoMachine.png"
+    },
+    {
+      "key": "koiSubmarine",
+      "file": "koiSubmarine.png"
+    },
+    {
+      "key": "cassettePlayer",
+      "file": "cassettePlayer.png"
+    },
+    {
+      "key": "trailBackpack",
+      "file": "trailBackpack.png"
+    },
+    {
+      "key": "gameController",
+      "file": "gameController.png"
+    },
+    {
+      "key": "hillTerrarium",
+      "file": "hillTerrarium.png"
+    },
+    {
+      "key": "windupHummingbird",
+      "file": "windupHummingbird.png"
+    },
+    {
+      "key": "planetLunchbox",
+      "file": "planetLunchbox.png"
+    },
+    {
+      "key": "foodTruck",
+      "file": "foodTruck.png"
+    },
+    {
+      "key": "ribbonCamera",
+      "file": "ribbonCamera.png"
+    },
+    {
+      "key": "snowGlobe",
+      "file": "snowGlobe.png"
+    },
+    {
+      "key": "lunarPod",
+      "file": "lunarPod.png"
+    },
+    {
+      "key": "submarinePorthole",
+      "file": "submarinePorthole.png"
+    },
+    {
+      "key": "domeBakery",
+      "file": "domeBakery.png"
+    },
+    {
+      "key": "jellyfishLamp",
+      "file": "jellyfishLamp.png"
+    },
+    {
+      "key": "headphoneStand",
+      "file": "headphoneStand.png"
+    },
+    {
+      "key": "weatherStation",
+      "file": "weatherStation.png"
+    },
+    {
+      "key": "deliveryScooter",
+      "file": "deliveryScooter.png"
+    },
+    {
+      "key": "recordShopCart",
+      "file": "recordShopCart.png"
+    },
+    {
+      "key": "planetariumProjector",
+      "file": "planetariumProjector.png"
+    },
+    {
+      "key": "capsuleWorkshop",
+      "file": "capsuleWorkshop.png"
+    },
+    {
+      "key": "rocketClock",
+      "file": "rocketClock.png"
+    },
+    {
+      "key": "domeGreenhouse",
+      "file": "domeGreenhouse.png"
+    },
+    {
+      "key": "glassOrrery",
+      "file": "glassOrrery.png"
+    },
+    {
+      "key": "underwaterCabin",
+      "file": "underwaterCabin.png"
+    },
+    {
+      "key": "synthesizer",
+      "file": "synthesizer.png"
+    },
+    {
+      "key": "mobileLibrary",
+      "file": "mobileLibrary.png"
+    },
+    {
+      "key": "vendingMachine",
+      "file": "vendingMachine.png"
+    },
+    {
+      "key": "campLantern",
+      "file": "campLantern.png"
+    },
+    {
+      "key": "arcadeCabinet",
+      "file": "arcadeCabinet.png"
+    },
+    {
+      "key": "moonPhaseClock",
+      "file": "moonPhaseClock.png"
+    }
+  ]
+}

@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:crazygames": "vite --mode crazygames",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build:crazygames": "tsc -b && vite build --mode crazygames && node scripts/package-crazygames.mjs",
+    "preview": "vite preview",
+    "test": "node --loader tsx _qa/crazygames-test.ts && npm run build && node scripts/verify-host-hashes.mjs && npm run build:crazygames"
   },
   "devDependencies": {
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^6.4.3"
   }

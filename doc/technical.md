@@ -128,3 +128,13 @@ _qa/
 - **调整存档字段与积分**：修改 `progress.ts` 的 schema/归一化/计分函数，并同步 `engine.ts` 的稳定节点快照；升级版本时必须保留旧最高关迁移。
 - **修改音效/语言**：分别编辑 `audio.ts`、`i18n.ts`。
 - **接入后台或分享**：新建独立模块并重新执行 API base、凭据、存储与双部署审计；核心玩法不得依赖头像权限。
+## Crazy Games 游客版技术附录
+
+- `src/cg/game/`、`src/cg/ui/` 与 `src/cg/i18n.ts` 是游客版隔离副本；`src/main-cg.ts` 只引用该目录。宿主继续从原 `src/game/`、`src/ui/`、`src/i18n.ts` 构建。
+- `scripts/verify-host-hashes.mjs` 固定检查宿主 `dist/` 的 HTML、JS、CSS、存储桥、logo 与海报 SHA-256；`npm test` 在游客测试后重建宿主并执行该门禁。
+- `scripts/generate-crazygames-patterns.py` 先生成风筝单帧 pilot，再用 40 个原创几何物件遮罩、边界距离色层与权威可达性规划输出 `src/cg/patterns/*.png`、manifest 和 `generated-patterns.ts`。两色关把两种线色分布到四列，保证教学时四列都有可读牌面。`package-crazygames.mjs` 只在游客产物中替换 Vite 复制的宿主图案，并复制 `THIRD_PARTY_NOTICES.txt`。
+- 游客 `BoardRenderer` 每批仍接收完整逻辑任务，但全局最多保留 4 个可见 Mission，并在共用洞口附近按视觉 lane 横向分散；权威拆针数量、计时和存档不受影响。`GameView` 在线轴上渲染线色、剩余针数和 READY/WAIT，disabled 同时使用灰度与文字。
+- 标题首屏不 import 图案；结果页与绣品册按需从相对 `./patterns/` URL 加载纹理。背景音乐也在首次用户手势后才创建请求。
+- `crazy-sdk.ts` 封装 SDK v3 初始化、loadingStart/loadingStop、gameplayStart/gameplayStop 与平台静音监听；没有广告调用。SDK 不可用时本地游戏继续运行。
+- 11–40 关的 `guestRule` 由引擎执行，上一列随游客中途存档持久化。`_qa/crazygames-test.ts` 验证 40 关权威解；`_qa/crazygames-review.mjs` 做真实浏览器首屏传输、前 10 关回放、SDK 事件和三档截图。
+- Carefree 播放循环点为 00:00.030–03:24.430；用户音量/静音和 SDK 强制静音分离，平台静音不会覆盖用户存储偏好。
