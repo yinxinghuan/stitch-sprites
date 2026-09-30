@@ -1,10 +1,10 @@
-import type { GameEngine } from '../game/engine'
+import type { GameEngine } from './game/engine'
 import type { PowerId } from './economy'
 import { completeLines, failLines } from './goals'
 import type { AudioPrefs } from './prefs'
-import { t } from '../i18n'
-import { LEVELS } from '../game/levels'
-import type { GameSnapshot, ThreadColor } from '../game/types'
+import { t } from './i18n'
+import { LEVELS } from './game/levels'
+import type { GameSnapshot, ThreadColor } from './game/types'
 
 const mouseIcon = '<svg class="cg-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="5"/><path d="M12 3v7"/></svg>'
 
@@ -22,7 +22,7 @@ export function tutorialMarkup(step: number): string {
   const pages = [
     {
       title: 'Start with the red reel',
-      body: 'Only the red stack can reach the ladybug. Click it, or press 1.',
+      body: 'Only the red stack can reach the Crimson Kite. Click it, or press 1.',
       keys: `${mouseIcon}${keycaps(['1'])}`,
       next: false,
     },
@@ -46,7 +46,7 @@ export function tutorialMarkup(step: number): string {
     },
     {
       title: 'Clear the hoop',
-      body: 'Empty every stitch to save the ladybug in the album. The result screen always names the next pattern and the next unlock.',
+      body: 'Empty every stitch to file the Crimson Kite in the album. The result screen always names the next pattern and the next unlock.',
       keys: `${keycaps(['P'])}<span>pause</span>${keycaps(['M'])}<span>mute</span>`,
       next: true,
     },
@@ -83,14 +83,26 @@ export function railMarkup(engine: GameEngine, snapshot: GameSnapshot): string {
   const vacuumColors = armed === 'vacuum'
     ? engine.currentNeededColors().map((color) => `<button class="cg-btn" type="button" data-cg="vacuum" data-color="${color}">${escapeHtml(t(`color.${color}`))}</button>`).join('')
     : ''
+  const rule = snapshot.level.guestRule === 'combined'
+    ? '<strong>Tight + Alternating</strong><span>4 rack slots. Switch stacks after every pick.</span>'
+    : snapshot.level.guestRule === 'alternate'
+      ? '<strong>Alternating Loom</strong><span>Switch stacks after every pick.</span>'
+      : snapshot.level.guestRule === 'tight-rack'
+        ? '<strong>Tight Rack</strong><span>Only 4 waiting slots. Extra slot restores one.</span>'
+        : '<strong>Classic Loom</strong><span>5 waiting slots. Work from the rim inward.</span>'
+  const visibleSpeeds = guest.speeds.filter((card, index) => card.state !== 'locked'
+    || guest.speeds.slice(0, index).every((earlier) => earlier.state !== 'locked'))
+  const visiblePowers = guest.powers.filter((card, index) => card.state !== 'locked'
+    || guest.powers.slice(0, index).every((earlier) => earlier.state !== 'locked'))
   return `
     <p class="cg-kicker">Pattern ${snapshot.level.id} of ${LEVELS.length}</p>
     <h2 class="cg-rail__title">${escapeHtml(name)}</h2>
     <p class="cg-rail__goal">${escapeHtml(guest.goal)}</p>
+    <p class="cg-rule">${rule}</p>
     <p class="cg-purse">${guest.showCoins ? `<span>Coins</span><strong>${guest.coins.toLocaleString()}</strong>` : 'Coin purse locked'}</p>
     <section>
       <h3>Pace</h3>
-      ${guest.speeds.map((card) => `
+      ${visibleSpeeds.map((card) => `
         <button class="cg-card cg-card--${card.state}" type="button" data-cg="speed" data-tier="${card.id.slice(6)}" ${card.state === 'locked' ? 'disabled' : ''}>
           <span>${escapeHtml(card.name)}</span>
           <small>${card.state === 'buy' ? `${card.price}` : card.state === 'locked' ? escapeHtml(card.lock.replace('After pattern ', 'After ')) : card.state === 'selected' ? 'On' : 'Switch'}</small>
@@ -99,7 +111,7 @@ export function railMarkup(engine: GameEngine, snapshot: GameSnapshot): string {
     </section>
     <section>
       <h3>Tools</h3>
-      ${guest.powers.map((card) => `
+      ${visiblePowers.map((card) => `
         <button class="cg-card cg-card--${card.state}" type="button" data-cg="power" data-power="${card.id}" ${card.state === 'locked' || card.state === 'spent' ? 'disabled' : ''}>
           <span>${card.key ? `<kbd class="cg-kbd">${card.key}</kbd>` : ''}${escapeHtml(card.name)}</span>
           <small>${card.state === 'locked' ? escapeHtml(card.lock.replace('After pattern ', 'After ')) : card.state === 'spent' ? 'Used' : card.state === 'armed' ? 'Choosing…' : `${card.price}`}</small>
@@ -150,6 +162,7 @@ export function settingsMarkup(prefs: AudioPrefs, muted: boolean): string {
       <button class="cg-btn" type="button" data-cg="mute">${muted ? 'Unmute' : 'Mute'} <kbd class="cg-kbd">M</kbd></button>
       <button class="cg-btn" type="button" data-cg="replay">Replay tutorial</button>
       <p class="cg-quiet">1–4 pick stacks. P pauses. Q W E V are Recall, Shuffle, Extra slot, and Peel once those tools are unlocked.</p>
+      <p class="cg-credit">Music: <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037" target="_blank" rel="noopener">Carefree</a> by Kevin MacLeod, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Loop points: 0.03–204.43s. Interface sounds: Kenney, CC0.</p>
       <button class="cg-btn cg-btn--gold" type="button" data-cg="settings-close">Back</button>
     </div>
   `
@@ -169,8 +182,9 @@ export function pauseMarkup(): string {
 export function resultMarkup(snapshot: GameSnapshot, engine: GameEngine): string {
   const guest = engine.guest
   const next = LEVELS[snapshot.level.id] ?? null
-  const nextUnlock = guest?.powers.find((card) => card.state === 'locked')
-    ?? guest?.speeds.find((card) => card.state === 'locked')
+  const nextUnlock = [...(guest?.powers ?? []), ...(guest?.speeds ?? [])]
+    .filter((card) => card.state === 'locked')
+    .sort((left, right) => Number(left.lock.match(/\d+/)?.[0] ?? 999) - Number(right.lock.match(/\d+/)?.[0] ?? 999))[0]
   const unlockLine = nextUnlock?.lock
     ? `Next unlock: ${nextUnlock.name}, ${nextUnlock.lock.toLowerCase()} (${nextUnlock.price ? `${nextUnlock.price} coins` : 'free'}).`
     : null
@@ -199,7 +213,7 @@ export function resultMarkup(snapshot: GameSnapshot, engine: GameEngine): string
   }
   const colors = engine.currentNeededColors().map((color: ThreadColor) => t(`color.${color}`)).join(', ')
   const recallReady = Boolean(guest?.powers.some((card) => card.id === 'recall' && card.state !== 'locked' && (guest?.coins ?? 0) >= 80))
-  const lines = failLines({ colors: colors || 'a color you can reach', name: t(snapshot.level.titleKey), recallReady })
+  const lines = failLines({ colors: colors || 'a color you can reach', name: t(snapshot.level.titleKey), recallReady, rackLimit: engine.slotLimit })
   return `
     <div class="cg-modal cg-result" role="dialog" aria-modal="true">
       <p class="cg-kicker">Tangled</p>

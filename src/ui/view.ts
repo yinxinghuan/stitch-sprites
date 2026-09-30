@@ -1,6 +1,3 @@
-import { bindGuestActions, pauseMarkup, railMarkup, resultMarkup, settingsMarkup, titleMarkup, tutorialMarkup } from '../cg/guest-dom'
-import { isCrazyGames } from '../cg/mode'
-import { loadAudioPrefs, loadTutorial, saveTutorial, type TutorialState } from '../cg/prefs'
 import { CODE_TO_COLOR, resolveThreadStyle } from '../game/palette'
 import { LEVELS } from '../game/levels'
 import type { GameEngine } from '../game/engine'
@@ -42,12 +39,6 @@ export class GameView {
   private galleryRenderedUnlocked = -1
   private leaderboardOpen = false
   private leaderboardRows: LeaderboardEntry[] = []
-  private started = false
-  private settingsOpen = false
-  private tutorial: TutorialState = isCrazyGames ? loadTutorial() : { done: true, step: 5 }
-  private clock: { setClockPaused(paused: boolean): void } | null = null
-  private railBody: HTMLElement | null = null
-  private coach: HTMLElement | null = null
   constructor(
     root: HTMLElement,
     private readonly leaderboard: LeaderboardService | null,
@@ -73,7 +64,7 @@ export class GameView {
         </section>
         <section class="ss-rack" aria-label="reel rack"><div class="ss-slots"></div></section>
         <section class="ss-tray" aria-label="thread reels"></section>
-        ${isCrazyGames ? '<aside class="cg-rail"><div class="cg-rail__body"></div></aside><div class="cg-coach" hidden></div>' : '<img class="ss-watermark" src="./alteru.svg" alt="" aria-hidden="true" draggable="false" />'}
+        <img class="ss-watermark" src="./alteru.svg" alt="" aria-hidden="true" draggable="false" />
         <div class="ss-overlay" hidden></div>
       </div>
     `
@@ -88,14 +79,7 @@ export class GameView {
     this.restartButton = root.querySelector('.ss-restart')!
     this.headingButton = root.querySelector('.ss-heading')!
     this.championButton = root.querySelector('.ss-champion')
-    this.railBody = root.querySelector('.cg-rail__body')
-    this.coach = root.querySelector('.cg-coach')
-    if (isCrazyGames) root.querySelector('.ss-app')?.classList.add('cg-app')
     root.addEventListener('dblclick', (event) => event.preventDefault(), { passive: false })
-  }
-
-  attachClock(clock: { setClockPaused(paused: boolean): void }): void {
-    this.clock = clock
   }
 
   bind(engine: GameEngine): void {
@@ -114,7 +98,6 @@ export class GameView {
       this.galleryOpen = true
       this.leaderboardOpen = false
       this.renderOverlay(engine.snapshot, engine)
-      if (isCrazyGames) this.renderGuest(engine.snapshot, engine)
     })
     this.championButton?.addEventListener('click', () => {
       this.leaderboardOpen = true
@@ -123,7 +106,6 @@ export class GameView {
       void this.refreshLeaderboard(engine)
     })
     window.addEventListener('keydown', (event) => {
-      if (isCrazyGames && this.handleGuestKey(event, engine)) return
       if (event.key.toLowerCase() === 'r') engine.restart()
       const index = Number(event.key) - 1
       if (index >= 0 && index < 4) void engine.selectColumn(index)
@@ -144,13 +126,12 @@ export class GameView {
     this.remainingLabel.textContent = t('hud.remaining', { n: snapshot.remaining })
     this.message.textContent = t(snapshot.messageKey)
     this.canvas.setAttribute('aria-label', `${t(snapshot.level.titleKey)}，${t('hud.remaining', { n: snapshot.remaining })}`)
-    this.renderSlots(snapshot, engine)
+    this.renderSlots(snapshot)
     this.renderTray(snapshot, engine)
     this.renderOverlay(snapshot, engine)
     this.restartButton.setAttribute('aria-label', t('action.restart'))
     this.headingButton.setAttribute('aria-label', t('action.gallery'))
     this.renderSound(engine)
-    if (isCrazyGames) this.renderGuest(snapshot, engine)
   }
 
   private renderSound(engine: GameEngine): void {
@@ -181,9 +162,8 @@ export class GameView {
     this.championButton.setAttribute('aria-label', `${t('action.rank')} · ${champion.name} · ${champion.score.toLocaleString()}`)
   }
 
-  private renderSlots(snapshot: GameSnapshot, engine?: GameEngine): void {
-    const count = isCrazyGames && engine ? engine.slotLimit : 5
-    const items = Array.from({ length: count }, (_, index) => {
+  private renderSlots(snapshot: GameSnapshot): void {
+    const items = Array.from({ length: 5 }, (_, index) => {
       const slot = snapshot.slots[index]
       if (!slot) return `
         <div class="ss-slot ss-slot--empty" aria-label="${t('slot.empty')}">
@@ -195,7 +175,7 @@ export class GameView {
       const thread = resolveThreadStyle(slot.spool.color, snapshot.level.displayPalette)
       const stateText = t(slot.state === 'working' ? 'status.working' : 'status.waiting')
       return `
-        <div class="ss-slot ss-slot--${slot.state}" data-slot="${index}" style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${stateText} ${slot.spool.remaining}">
+        <div class="ss-slot ss-slot--${slot.state}" style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${stateText} ${slot.spool.remaining}">
           <span class="ss-slot__notch ss-slot__notch--top"></span>
           <span class="ss-slot__thread"></span>
           <span class="ss-color-symbol ss-color-symbol--${thread.symbol}" aria-hidden="true"></span>
@@ -206,11 +186,6 @@ export class GameView {
       `
     })
     this.slots.innerHTML = items.join('')
-    if (isCrazyGames && engine?.guest?.armed === 'recall') {
-      this.slots.querySelectorAll<HTMLElement>('[data-slot]').forEach((slot) => {
-        slot.addEventListener('pointerdown', () => engine.confirmRecall(Number(slot.dataset.slot)))
-      })
-    }
   }
 
   private spoolMarkup(spool: SpoolState, columnIndex: number, enabled: boolean, level: LevelDefinition): string {
@@ -233,14 +208,13 @@ export class GameView {
   private renderTray(snapshot: GameSnapshot, engine: GameEngine): void {
     this.tray.innerHTML = snapshot.columns.map((column, index) => {
       const top = column[0]
-      const enabled = engine.canSelectColumn(index) || (isCrazyGames && engine.guest?.armed === 'shuffle')
+      const enabled = engine.canSelectColumn(index)
       const backLayers = column.slice(1, VISIBLE_BACK_CARD_COUNT + 1).map((spool, depth) => {
         const thread = resolveThreadStyle(spool.color, snapshot.level.displayPalette)
         return `<span class="ss-spool-back" aria-hidden="true" style="--depth:${depth + 1};--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}"></span>`
       }).reverse().join('')
       return `
         <div class="ss-column" aria-label="${t('tray.column', { n: index + 1 })}">
-          ${isCrazyGames ? `<span class="cg-key">${index + 1}</span>` : ''}
           ${backLayers}
           ${top ? this.spoolMarkup(top, index, enabled, snapshot.level) : '<span class="ss-column__empty"></span>'}
         </div>
@@ -256,7 +230,6 @@ export class GameView {
   }
 
   private renderOverlay(snapshot: GameSnapshot, engine: GameEngine): void {
-    if (isCrazyGames && this.renderGuestOverlay(snapshot, engine)) return
     if (this.leaderboardOpen) {
       this.renderLeaderboard(snapshot, engine)
       return
@@ -467,201 +440,5 @@ export class GameView {
       ctx.lineTo(x + cell * 0.18, y + cell * 0.82)
       ctx.stroke()
     }))
-  }
-
-  private renderGuest(snapshot: GameSnapshot, engine: GameEngine): void {
-    this.syncTutorial(snapshot)
-    const app = this.overlay.parentElement
-    const showCoach = this.started && !this.tutorial.done && snapshot.level.id === 1 && snapshot.phase === 'playing' && !this.settingsOpen && !engine.isPaused && !this.galleryOpen
-    app?.classList.toggle('cg-coaching', showCoach)
-    app?.classList.toggle('cg-tutor-pick', showCoach && this.tutorial.step === 0)
-    app?.classList.toggle('cg-arm-recall', engine.guest?.armed === 'recall')
-    app?.classList.toggle('cg-arm-shuffle', engine.guest?.armed === 'shuffle')
-    if (this.railBody) {
-      this.railBody.innerHTML = railMarkup(engine, snapshot)
-      this.bindGuest(this.railBody, snapshot, engine)
-    }
-    if (this.coach) {
-      this.coach.hidden = !showCoach
-      if (showCoach) {
-        this.coach.innerHTML = tutorialMarkup(this.tutorial.step)
-        this.bindGuest(this.coach, snapshot, engine)
-      }
-    }
-    if (this.galleryOpen) {
-      const header = this.overlay.querySelector('.ss-gallery__header div')
-      if (header && !header.querySelector('.cg-album-note')) {
-        const note = document.createElement('p')
-        note.className = 'cg-quiet cg-album-note'
-        const upcoming = LEVELS.find((level) => level.id === engine.unlockedLevel + 1)
-        note.textContent = upcoming
-          ? `Next: clear pattern ${engine.unlockedLevel} to unlock pattern ${upcoming.id}.`
-          : 'Every pattern is in the album. Replay any of them.'
-        header.appendChild(note)
-      }
-    }
-  }
-
-  private renderGuestOverlay(snapshot: GameSnapshot, engine: GameEngine): boolean {
-    if (this.galleryOpen) return false
-    if (this.settingsOpen) {
-      if (!this.overlay.querySelector('.cg-volume')) {
-        this.overlay.hidden = false
-        this.overlay.innerHTML = settingsMarkup(loadAudioPrefs(), engine.audio.isMuted)
-        this.bindGuest(this.overlay, snapshot, engine)
-      }
-      return true
-    }
-    if (!this.started) {
-      this.overlay.hidden = false
-      this.overlay.innerHTML = titleMarkup(engine.unlockedLevel > 1 || snapshot.removed > 0 || snapshot.slots.length > 0)
-      this.bindGuest(this.overlay, snapshot, engine)
-      return true
-    }
-    if (engine.isPaused) {
-      this.overlay.hidden = false
-      this.overlay.innerHTML = pauseMarkup()
-      this.bindGuest(this.overlay, snapshot, engine)
-      return true
-    }
-    if (snapshot.phase !== 'playing') {
-      this.overlay.hidden = false
-      this.overlay.innerHTML = resultMarkup(snapshot, engine)
-      this.paintPatternCanvases()
-      this.bindGuest(this.overlay, snapshot, engine)
-      return true
-    }
-    return false
-  }
-
-  private bindGuest(root: ParentNode, snapshot: GameSnapshot, engine: GameEngine): void {
-    bindGuestActions(root, engine, {
-      play: () => {
-        this.started = true
-        void engine.audio.unlock()
-        this.renderOverlay(snapshot, engine)
-        this.renderGuest(snapshot, engine)
-      },
-      settings: () => {
-        this.settingsOpen = true
-        this.renderOverlay(engine.snapshot, engine)
-      },
-      closeSettings: () => {
-        this.settingsOpen = false
-        this.renderOverlay(engine.snapshot, engine)
-      },
-      album: () => {
-        this.galleryOpen = true
-        this.settingsOpen = false
-        this.renderOverlay(engine.snapshot, engine)
-        this.renderGuest(engine.snapshot, engine)
-      },
-      resume: () => this.setHold(engine, false),
-      restart: () => engine.restart(),
-      next: () => {
-        if (snapshot.level.id < LEVELS.length) engine.next()
-        else {
-          this.galleryOpen = true
-          this.renderOverlay(engine.snapshot, engine)
-        }
-      },
-      mute: () => {
-        engine.audio.toggle()
-        this.renderSound(engine)
-        const button = this.overlay.querySelector<HTMLButtonElement>('[data-cg="mute"]')
-        if (button) button.innerHTML = `${engine.audio.isMuted ? 'Unmute' : 'Mute'} <kbd class="cg-kbd">M</kbd>`
-      },
-      volume: (value) => engine.audio.setVolume(value),
-      replay: () => {
-        this.tutorial = { done: false, step: 0 }
-        saveTutorial(this.tutorial)
-        this.settingsOpen = false
-        this.galleryOpen = false
-        this.started = true
-        void engine.audio.unlock()
-        engine.openLevel(1)
-      },
-      tutorNext: () => this.setTutorialStep(Math.min(5, this.tutorial.step + 1)),
-      tutorSkip: () => this.setTutorialStep(5),
-    })
-  }
-
-  private setHold(engine: GameEngine, paused: boolean): void {
-    engine.setPaused(paused)
-    this.clock?.setClockPaused(paused)
-  }
-
-  private setTutorialStep(step: number): void {
-    this.tutorial = step >= 5 ? { done: true, step: 5 } : { done: false, step }
-    saveTutorial(this.tutorial)
-  }
-
-  private syncTutorial(snapshot: GameSnapshot): void {
-    if (this.tutorial.done || snapshot.level.id !== 1) return
-    if (this.tutorial.step === 0 && (snapshot.slots.length > 0 || snapshot.removed > 0)) this.setTutorialStep(1)
-    if (snapshot.phase === 'complete') this.setTutorialStep(5)
-  }
-
-  private handleGuestKey(event: KeyboardEvent, engine: GameEngine): boolean {
-    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return false
-    if (event.target instanceof HTMLInputElement) return false
-    const key = event.key.toLowerCase()
-    const snapshot = engine.snapshot
-    if (key === 'enter' && !this.started && !this.settingsOpen) {
-      this.started = true
-      void engine.audio.unlock()
-      this.renderOverlay(snapshot, engine)
-      return true
-    }
-    if (key === 'm') {
-      engine.audio.toggle()
-      this.renderSound(engine)
-      event.preventDefault()
-      return true
-    }
-    if (key === '[') {
-      engine.audio.setVolume(engine.audio.volumeLevel - 0.1)
-      return true
-    }
-    if (key === ']') {
-      engine.audio.setVolume(engine.audio.volumeLevel + 0.1)
-      return true
-    }
-    if (!this.started || this.settingsOpen) return true
-    if (key === 'p' && !this.galleryOpen && snapshot.phase === 'playing') {
-      this.setHold(engine, !engine.isPaused)
-      event.preventDefault()
-      return true
-    }
-    if (key === 'g') {
-      this.galleryOpen = !this.galleryOpen
-      this.renderOverlay(snapshot, engine)
-      this.renderGuest(snapshot, engine)
-      return true
-    }
-    if (this.galleryOpen || engine.isPaused) return true
-    if ((key === 'n' || key === 'enter') && snapshot.phase === 'complete') {
-      if (snapshot.level.id < LEVELS.length) engine.next()
-      else this.galleryOpen = true
-      return true
-    }
-    if ((key === 'n' || key === 'enter') && snapshot.phase === 'playing' && !this.tutorial.done && this.tutorial.step >= 1) {
-      this.setTutorialStep(this.tutorial.step + 1)
-      return true
-    }
-    if (key === 'r' && snapshot.phase !== 'complete') {
-      engine.restart()
-      return true
-    }
-    if (key === 'q') engine.armPower('recall')
-    if (key === 'w') engine.armPower('shuffle')
-    if (key === 'e') engine.armPower('extra')
-    if (key === 'v') engine.armPower('vacuum')
-    const index = Number(event.key) - 1
-    if (index >= 0 && index < 4) {
-      void engine.selectColumn(index)
-      return true
-    }
-    return key === 'q' || key === 'w' || key === 'e' || key === 'v' || key === 'r' || key === 'g' || key === 'p' || key === 'm'
   }
 }

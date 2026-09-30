@@ -1,4 +1,5 @@
 import { isCrazyGames } from './cg/mode'
+import { crazySdkForcesMute, finishCrazyLoading, initializeCrazySdk, onCrazyMuteChange } from './cg/crazy-sdk'
 import bgmUrl from './cg/audio/bgm.mp3'
 import buyUrl from './cg/audio/buy.ogg'
 import failUrl from './cg/audio/fail.ogg'
@@ -7,16 +8,19 @@ import stitchUrl from './cg/audio/stitch.ogg'
 import travelUrl from './cg/audio/travel.ogg'
 import waitUrl from './cg/audio/wait.ogg'
 import winUrl from './cg/audio/win.ogg'
-import { GameEngine } from './game/engine'
-import { BoardRenderer } from './game/renderer'
-import type { GameSnapshot } from './game/types'
+import { GameEngine } from './cg/game/engine'
+import { BoardRenderer } from './cg/game/renderer'
+import type { GameSnapshot } from './cg/game/types'
 import { createGuestServices } from './cg/platform'
 import { loadAudioPrefs, saveAudioPrefs } from './cg/prefs'
-import { GameView } from './ui/view'
+import { GameView } from './cg/ui/view'
 import './styles.css'
 import './cg/desk.css'
 
 if (!isCrazyGames) throw new Error('Guest entry loaded outside the Crazy Games build')
+
+async function start(): Promise<void> {
+await initializeCrazySdk()
 
 document.documentElement.lang = 'en'
 document.documentElement.classList.add('cg-root')
@@ -44,6 +48,14 @@ const engine = new GameEngine({
   onMastery: () => {},
 }, platform.progress)
 
+if (new URLSearchParams(location.search).get('qa') === '1') {
+  ;(window as unknown as { __CG_QA__: unknown }).__CG_QA__ = {
+    get snapshot() { return engine.snapshot },
+    get isProcessing() { return engine.isProcessing },
+    selectColumn: (column: number) => engine.selectColumn(column),
+  }
+}
+
 const prefs = loadAudioPrefs()
 engine.audio.useSamples(bgmUrl, {
   spool: spoolUrl,
@@ -55,12 +67,18 @@ engine.audio.useSamples(bgmUrl, {
   fail: failUrl,
   purchase: buyUrl,
 }, prefs, () => {
-  saveAudioPrefs({ muted: engine.audio.isMuted, volume: engine.audio.volumeLevel })
+  saveAudioPrefs({ muted: engine.audio.preferenceMuted, volume: engine.audio.volumeLevel })
 })
+engine.audio.setPlatformMuted(crazySdkForcesMute())
+onCrazyMuteChange((muted) => engine.audio.setPlatformMuted(muted))
 
 view.attachClock(renderer)
 view.bind(engine)
 view.update(engine.snapshot, engine)
 renderer.setSnapshot(engine.snapshot)
 engine.finalizeInitialProgress()
+finishCrazyLoading()
 window.addEventListener('pagehide', () => platform.progress.flush())
+}
+
+void start()

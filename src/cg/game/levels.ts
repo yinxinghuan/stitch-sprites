@@ -1,0 +1,259 @@
+import { CODE_TO_COLOR } from './palette'
+import { GENERATED_PATTERNS } from './generated-patterns'
+import { findReachable, reachableColors } from './reachability'
+import type { Cell, LevelDefinition, SpoolDefinition, SpoolState, ThreadColor } from './types'
+
+const LEVEL_COPY: Record<string, { titleKey: string; completeKey: string }> = Object.fromEntries(
+  GENERATED_PATTERNS.map(({ key }) => [key, { titleKey: `level.${key}`, completeKey: `complete.${key}` }]),
+)
+
+const PATTERN_SOURCE = GENERATED_PATTERNS
+
+function defineLevel(index: number): LevelDefinition {
+  const generated = PATTERN_SOURCE[index]
+  if (!generated) throw new Error(`Missing generated pattern ${index + 1}`)
+  const id = index + 1
+  const copy = LEVEL_COPY[generated.key]
+  if (!copy) throw new Error(`Missing copy metadata for ${generated.key}`)
+  const width = generated.rows[0]?.length ?? 0
+  if (!width || generated.rows.some((row) => row.length !== width)) {
+    throw new Error(`Level ${id}: all pattern rows must have the same width`)
+  }
+  const columns: SpoolDefinition[][] = generated.columns.map((column, columnIndex) => column.map(([code, capacity], spoolIndex) => {
+    const color = CODE_TO_COLOR[code]
+    if (!color) throw new Error(`Level ${id}: unknown generated spool color ${code}`)
+    return {
+      id: `l${id}-${color}-${columnIndex + 1}-${String(spoolIndex + 1).padStart(2, '0')}`,
+      color,
+      capacity,
+    }
+  }))
+  return {
+    id,
+    ...copy,
+    reveal: generated.key,
+    density: 1,
+    rows: generated.rows,
+    displayPalette: Object.fromEntries(
+      Object.entries(generated.palette)
+        .map(([code, hex]) => [CODE_TO_COLOR[code], hex])
+        .filter(([color]) => Boolean(color)),
+    ) as Partial<Record<ThreadColor, string>>,
+    tutorial: id === 1,
+    ...(id >= 31
+      ? { guestRule: 'combined' as const }
+      : id >= 21
+        ? { guestRule: 'alternate' as const }
+        : id >= 11
+          ? { guestRule: 'tight-rack' as const }
+          : {}),
+    columns,
+    solution: generated.solution,
+  }
+}
+
+export const LEVELS: LevelDefinition[] = PATTERN_SOURCE.map((_, index) => defineLevel(index))
+
+export const DUAL_ENTRY_LAB_LEVEL: LevelDefinition = {
+  id: 42,
+  titleKey: 'level.dualEntryLab',
+  completeKey: 'complete.dualEntryLab',
+  reveal: 'dual-entry-lab',
+  density: 1,
+  textureMode: 'procedural',
+  tutorial: false,
+  displayPalette: {
+    lake: '#3e9bd3', coral: '#ed5b67', leaf: '#55ad6e',
+    sun: '#f3bf3f', violet: '#9473c8', ink: '#353541',
+  },
+  rows: [
+    '........R........',
+    '.....BBBRRRR.....',
+    '...BBBBBYRRRRR...',
+    '..BBBGGGYYYYRRR..',
+    '..BBGGGGKYYYYRR..',
+    '.BBGGGPPKKKYYYRR.',
+    '.BBGGPPPKKKKYYRR.',
+    '.BBGGPPPKKKKYYRR.',
+    'BBGGPPPPKKKKKYYRR',
+    '.BBGGPPPKKKKYYRR.',
+    '.BBGGPPPKKKKYYRR.',
+    '.BBGGGPPKKKYYYRR.',
+    '..BBGGGGKYYYYRR..',
+    '..BBBGGGYYYYRRR..',
+    '...BBBBBYRRRRR...',
+    '.....BBBRRRR.....',
+    '........R........',
+  ],
+  columns: [
+    [{ id: 'lab-lake-entry', color: 'lake', capacity: 40 }],
+    [{ id: 'lab-leaf-left', color: 'leaf', capacity: 30 }],
+    [{ id: 'lab-coral-entry', color: 'coral', capacity: 44 }],
+    [
+      { id: 'lab-violet-left', color: 'violet', capacity: 20 },
+      { id: 'lab-ink-right', color: 'ink', capacity: 29 },
+      { id: 'lab-sun-right', color: 'sun', capacity: 34 },
+    ],
+  ],
+  solution: [0, 1, 3, 2, 3, 3],
+}
+
+const MULTI_RING_COLORS: ThreadColor[] = [
+  'lake', 'coral', 'leaf', 'sun', 'violet', 'ink',
+  'coral', 'violet', 'lake', 'ink', 'sun', 'leaf',
+  'sun', 'lake', 'ink', 'leaf', 'coral', 'violet',
+]
+
+const MULTI_RING_CODES: Record<ThreadColor, string> = {
+  lake: 'B', coral: 'R', leaf: 'G', sun: 'Y', violet: 'P', ink: 'K', aqua: 'C',
+}
+
+function createMultiRingPattern(): { rows: string[]; counts: number[] } {
+  const size = 73
+  const center = (size - 1) / 2
+  const radius = center - 0.5
+  const ringWidth = radius / MULTI_RING_COLORS.length
+  const counts = MULTI_RING_COLORS.map(() => 0)
+  const rows = Array.from({ length: size }, (_, row) => (
+    Array.from({ length: size }, (_, col) => {
+      const distance = Math.hypot(row - center, col - center)
+      if (distance > radius) return '.'
+      const ringIndex = Math.min(
+        MULTI_RING_COLORS.length - 1,
+        Math.floor((radius - distance) / ringWidth),
+      )
+      counts[ringIndex] += 1
+      return MULTI_RING_CODES[MULTI_RING_COLORS[ringIndex]]
+    }).join('')
+  ))
+  return { rows, counts }
+}
+
+const MULTI_RING_PATTERN = createMultiRingPattern()
+const multiRingSpool = (ringIndex: number): SpoolDefinition => ({
+  id: `ring-${String(ringIndex + 1).padStart(2, '0')}-${MULTI_RING_COLORS[ringIndex]}`,
+  color: MULTI_RING_COLORS[ringIndex],
+  capacity: MULTI_RING_PATTERN.counts[ringIndex],
+})
+
+export const MULTI_RING_LAB_LEVEL: LevelDefinition = {
+  id: 42,
+  titleKey: 'level.multiRingLab',
+  completeKey: 'complete.multiRingLab',
+  reveal: 'multi-ring-lab',
+  density: 1,
+  textureMode: 'procedural',
+  tutorial: false,
+  displayPalette: {
+    lake: '#3e9bd3', coral: '#ed5b67', leaf: '#55ad6e',
+    sun: '#f3bf3f', violet: '#9473c8', ink: '#353541',
+  },
+  rows: MULTI_RING_PATTERN.rows,
+  columns: [
+    [0, 4].map(multiRingSpool),
+    [1, 5, 10, 6, 16, 12].map(multiRingSpool),
+    [2, 9, 7, 17, 13].map(multiRingSpool),
+    [3, 11, 8, 15, 14].map(multiRingSpool),
+  ],
+  solution: [0, 1, 2, 3, 0, 1, 1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 3, 3],
+}
+
+export function activateDualEntryLab(): void {
+  LEVELS[LEVELS.length - 1] = DUAL_ENTRY_LAB_LEVEL
+}
+
+export function activateMultiRingLab(): void {
+  LEVELS[LEVELS.length - 1] = MULTI_RING_LAB_LEVEL
+}
+
+export function createCells(level: LevelDefinition): Cell[][] {
+  return level.rows.flatMap((row) => Array.from({ length: level.density }, () => (
+    [...row].flatMap((code) => Array.from({ length: level.density }, () => ({
+      color: code === '.' ? null : CODE_TO_COLOR[code] ?? null,
+      cleared: false,
+    })))
+  )))
+}
+
+export function createColumns(level: LevelDefinition): SpoolState[][] {
+  const capacityScale = level.density * level.density
+  return level.columns.map((column) => column.map((spool) => ({
+    ...spool,
+    capacity: spool.capacity * capacityScale,
+    remaining: spool.capacity * capacityScale,
+  })))
+}
+
+function countCells(level: LevelDefinition): Map<ThreadColor, number> {
+  const counts = new Map<ThreadColor, number>()
+  createCells(level).flat().forEach((cell) => {
+    if (cell.color) counts.set(cell.color, (counts.get(cell.color) ?? 0) + 1)
+  })
+  return counts
+}
+
+export function validateLevels(): void {
+  if (LEVELS.length < 24) throw new Error(`Expected a complete level collection, found ${LEVELS.length}`)
+  let previousColorCount = 0
+  LEVELS.forEach((level) => {
+    const colors = new Set(level.rows.join('').replaceAll('.', '')).size
+    if (colors < previousColorCount) {
+      throw new Error(`Level ${level.id}: color count order regressed`)
+    }
+    previousColorCount = colors
+    const initialCells = createCells(level)
+    const entryColors = reachableColors(initialCells, findReachable(initialCells))
+    if (!entryColors.size) throw new Error(`Level ${level.id}: expected a reachable outer color`)
+    if (level.id === 1 && entryColors.size !== 1) {
+      throw new Error(`Level 1: expected one tutorial outer color, found ${[...entryColors].join(', ')}`)
+    }
+    const cells = countCells(level)
+    const spools = new Map<ThreadColor, number>()
+    createColumns(level).flat().forEach((spool) => {
+      spools.set(spool.color, (spools.get(spool.color) ?? 0) + spool.capacity)
+    })
+    cells.forEach((count, color) => {
+      if (spools.get(color) !== count) {
+        throw new Error(`Level ${level.id}: ${color} cells=${count}, spool capacity=${spools.get(color) ?? 0}`)
+      }
+    })
+  })
+}
+
+export function validateDualEntryLab(): void {
+  const level = DUAL_ENTRY_LAB_LEVEL
+  const initialCells = createCells(level)
+  const entryColors = reachableColors(initialCells, findReachable(initialCells))
+  if (entryColors.size !== 2 || !entryColors.has('lake') || !entryColors.has('coral')) {
+    throw new Error(`Dual-entry lab: expected lake + coral entries, found ${[...entryColors].join(', ')}`)
+  }
+  const cells = countCells(level)
+  const spools = new Map<ThreadColor, number>()
+  createColumns(level).flat().forEach((spool) => {
+    spools.set(spool.color, (spools.get(spool.color) ?? 0) + spool.capacity)
+  })
+  cells.forEach((count, color) => {
+    if (spools.get(color) !== count) {
+      throw new Error(`Dual-entry lab: ${color} cells=${count}, spool capacity=${spools.get(color) ?? 0}`)
+    }
+  })
+}
+
+export function validateMultiRingLab(): void {
+  const level = MULTI_RING_LAB_LEVEL
+  const initialCells = createCells(level)
+  const entryColors = reachableColors(initialCells, findReachable(initialCells))
+  if (entryColors.size !== 1 || !entryColors.has('lake')) {
+    throw new Error(`Multi-ring lab: expected a lake outer ring, found ${[...entryColors].join(', ')}`)
+  }
+  const cells = countCells(level)
+  const spools = new Map<ThreadColor, number>()
+  createColumns(level).flat().forEach((spool) => {
+    spools.set(spool.color, (spools.get(spool.color) ?? 0) + spool.capacity)
+  })
+  cells.forEach((count, color) => {
+    if (spools.get(color) !== count) {
+      throw new Error(`Multi-ring lab: ${color} cells=${count}, spool capacity=${spools.get(color) ?? 0}`)
+    }
+  })
+}

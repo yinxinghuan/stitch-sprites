@@ -1,5 +1,5 @@
-import type { PersistedProgress } from '../game/progress'
-import type { LevelDefinition, ThreadColor } from '../game/types'
+import type { PersistedProgress } from './game/progress'
+import type { LevelDefinition, ThreadColor } from './game/types'
 
 export type PowerId = 'recall' | 'shuffle' | 'extra' | 'vacuum'
 

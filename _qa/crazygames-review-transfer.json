@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "screenshots": [],
+  "firstTen": [],
+  "initialTransfer": {
+    "bytes": 183144,
+    "files": [
+      {
+        "url": "./",
+        "bytes": 1254
+      },
+      {
+        "url": "./assets/index-CglqK1XU.css",
+        "bytes": 27219
+      },
+      {
+        "url": "./assets/index-D-F7Cvfe.js",
+        "bytes": 153310
+      },
+      {
+        "url": "./patterns/ladybug.png",
+        "bytes": 1361
+      }
+    ],
+    "requestedPatterns": [
+      {
+        "url": "./patterns/ladybug.png",
+        "bytes": 1361
+      }
+    ]
+  }
+}

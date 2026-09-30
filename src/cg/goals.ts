@@ -30,12 +30,13 @@ export function failLines(input: {
   colors: string
   name: string
   recallReady: boolean
+  rackLimit: number
 }): string[] {
   return [
     `The outer layer needs ${input.colors}.`,
     `Next: replay ${input.name}. Your coins stay.`,
     input.recallReady
       ? 'Recall (Q) puts an unused waiting reel back for 80 coins.'
-      : 'Five waiting reels that cannot reach the edge ends the pattern.',
+      : `${input.rackLimit} waiting reels that cannot reach the edge ends the pattern.`,
   ]
 }

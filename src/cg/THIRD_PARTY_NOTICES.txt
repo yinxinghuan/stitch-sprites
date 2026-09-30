@@ -1,0 +1,19 @@
+THIRD-PARTY NOTICES — UNSTITCH SPRITES (CRAZY GAMES GUEST BUILD)
+
+Carefree
+Copyright (c) Kevin MacLeod (incompetech.com)
+Source: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: https://creativecommons.org/licenses/by/4.0/legalcode
+Local modification: encoded as MP3 for web playback; playback loops from 00:00.030 to 03:24.430.
+
+Interface Sounds
+Copyright Kenney (www.kenney.nl)
+Source: https://kenney.nl/assets/interface-sounds
+License: Creative Commons CC0 1.0 Universal
+License text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Local modification: selected OGG files were renamed by gameplay event; audio content is unchanged.
+
+The 40 files under patterns/ were generated specifically for this project by
+scripts/generate-crazygames-patterns.py. They do not trace, copy, or adapt any
+third-party cross-stitch chart or artwork.

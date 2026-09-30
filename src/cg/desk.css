@@ -235,6 +235,27 @@
 .cg-root .cg-quiet,
 .cg-root .cg-rail__goal { color: var(--cg-muted); }
 
+.cg-root .cg-rule {
+  margin: 0;
+  padding: 7px 8px;
+  display: grid;
+  gap: 2px;
+  border-left: 3px solid var(--cg-gold);
+  background: #fffaf0;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.cg-root .cg-rule span { color: var(--cg-muted); }
+
+.cg-root .cg-credit {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  color: var(--cg-muted) !important;
+}
+
+.cg-root .cg-credit a { color: var(--cg-ink); }
+
 .cg-root .cg-purse {
   margin: 0;
   padding: 8px 10px;
@@ -263,7 +284,7 @@
 
 .cg-root .cg-card,
 .cg-root .cg-btn {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 8px;
   display: flex;
   align-items: center;
@@ -443,14 +464,14 @@
   .cg-root .cg-rail h3 { margin: 0; }
   .cg-root .cg-purse { padding: 4px 8px; }
   .cg-root .cg-card,
-  .cg-root .cg-btn { min-height: 26px; padding: 2px 6px; font-size: 11px; }
+  .cg-root .cg-btn { min-height: 44px; padding: 4px 6px; font-size: 11px; }
   .cg-root .ss-column { height: 96px; }
   .cg-root .ss-slot small { display: none; }
   .cg-root .cg-coach__card { padding: 6px 8px; gap: 2px 6px; }
   .cg-root .cg-coach__card h2 { font-size: 14px; }
   .cg-root .cg-coach__card p,
   .cg-root .cg-rail__goal { font-size: 12px; }
-  .cg-root .cg-coach__card .cg-btn { min-height: 28px; }
+  .cg-root .cg-coach__card .cg-btn { min-height: 44px; }
   .cg-root .ss-gallery { width: min(720px, calc(100% - 16px)); }
   .cg-root .ss-gallery__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

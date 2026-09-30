@@ -1,4 +1,4 @@
-import { LocalProgressRepository, type PersistedProgress } from '../game/progress'
+import { LocalProgressRepository, type PersistedProgress } from './game/progress'
 import type { PlatformServices } from '../platform/contracts'
 
 export function createGuestServices(): PlatformServices {

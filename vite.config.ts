@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 
 const FAVICON = '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'%3E%3Ccircle cx=\'16\' cy=\'16\' r=\'12\' fill=\'%23f7f3ec\' stroke=\'%23241f1c\' stroke-width=\'3\'/%3E%3Ccircle cx=\'16\' cy=\'16\' r=\'6\' fill=\'none\' stroke=\'%23a67c2d\' stroke-width=\'2\'/%3E%3C/svg%3E" />'
+const CRAZY_SDK = '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>'
 
 function crazyGamesGuestHtml(): Plugin {
   return {
@@ -18,7 +19,7 @@ function crazyGamesGuestHtml(): Plugin {
             '\n    <script>window.alteruLocalStorage=window.localStorage;window.alteruSessionStorage=window.sessionStorage;</script>',
           )
           .replace('src="./src/main.ts"', 'src="./src/main-cg.ts"')
-          .replace('</head>', `    ${FAVICON}\n  </head>`)
+          .replace('</head>', `    ${FAVICON}\n    ${CRAZY_SDK}\n  </head>`)
       },
     },
   }

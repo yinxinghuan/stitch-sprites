@@ -1,13 +1,13 @@
-// Pack the Crazy Games guest build next to a zip with index.html at the root.
+// Stage the Crazy Games guest build for the externally hosted review page.
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist-crazygames')
 const staticDir = path.join(root, 'artifacts', 'crazygames')
-const zipPath = path.join(root, 'artifacts', 'unstitch-sprites-crazygames.zip')
+const originalPatterns = path.join(root, 'src', 'cg', 'patterns')
+const notices = path.join(root, 'src', 'cg', 'THIRD_PARTY_NOTICES.txt')
 
 if (!existsSync(path.join(dist, 'index.html'))) {
   console.error('dist-crazygames/index.html is missing. Run vite build --mode crazygames first.')
@@ -23,6 +23,12 @@ for (const relative of [
 ]) {
   rmSync(path.join(dist, relative), { force: true })
 }
+
+// Vite copies the host public directory verbatim. Replace that copy only in
+// the Crazy Games output so the host files and hashes stay byte-identical.
+rmSync(path.join(dist, 'patterns'), { recursive: true, force: true })
+cpSync(originalPatterns, path.join(dist, 'patterns'), { recursive: true })
+cpSync(notices, path.join(dist, 'THIRD_PARTY_NOTICES.txt'))
 
 const banned = [
   'AlterU',
@@ -78,12 +84,4 @@ if (!script) {
 
 rmSync(staticDir, { recursive: true, force: true })
 cpSync(dist, staticDir, { recursive: true })
-rmSync(zipPath, { force: true })
-execFileSync('zip', ['-r', '-X', zipPath, '.'], { cwd: dist, stdio: 'inherit' })
-const listing = execFileSync('unzip', ['-l', zipPath], { encoding: 'utf8' })
-if (!listing.split('\n').some((line) => /\sindex\.html$/.test(line) && !line.includes('/'))) {
-  console.error('zip is missing index.html at the archive root')
-  process.exit(1)
-}
 console.log(`static: ${staticDir}`)
-console.log(`zip: ${zipPath}`)

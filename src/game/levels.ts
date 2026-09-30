@@ -7,12 +7,8 @@ const LEVEL_COPY: Record<string, { titleKey: string; completeKey: string }> = Ob
   GENERATED_PATTERNS.map(({ key }) => [key, { titleKey: `level.${key}`, completeKey: `complete.${key}` }]),
 )
 
-const PATTERN_SOURCE = import.meta.env.MODE === 'crazygames'
-  ? GENERATED_PATTERNS.filter((pattern) => pattern.key !== 'alteruBloom')
-  : GENERATED_PATTERNS
-
 function defineLevel(index: number): LevelDefinition {
-  const generated = PATTERN_SOURCE[index]
+  const generated = GENERATED_PATTERNS[index]
   if (!generated) throw new Error(`Missing generated pattern ${index + 1}`)
   const id = index + 1
   const copy = LEVEL_COPY[generated.key]
@@ -47,7 +43,7 @@ function defineLevel(index: number): LevelDefinition {
   }
 }
 
-export const LEVELS: LevelDefinition[] = PATTERN_SOURCE.map((_, index) => defineLevel(index))
+export const LEVELS: LevelDefinition[] = GENERATED_PATTERNS.map((_, index) => defineLevel(index))
 
 export const DUAL_ENTRY_LAB_LEVEL: LevelDefinition = {
   id: 42,
@@ -190,12 +186,12 @@ function countCells(level: LevelDefinition): Map<ThreadColor, number> {
 export function validateLevels(): void {
   if (LEVELS.length < 24) throw new Error(`Expected a complete level collection, found ${LEVELS.length}`)
   let previousColorCount = 0
-  LEVELS.forEach((level) => {
-    const colors = new Set(level.rows.join('').replaceAll('.', '')).size
-    if (colors < previousColorCount) {
+  LEVELS.forEach((level, index) => {
+    const generated = GENERATED_PATTERNS[index]
+    if (generated.colorCount < previousColorCount) {
       throw new Error(`Level ${level.id}: color count order regressed`)
     }
-    previousColorCount = colors
+    previousColorCount = generated.colorCount
     const initialCells = createCells(level)
     const entryColors = reachableColors(initialCells, findReachable(initialCells))
     if (!entryColors.size) throw new Error(`Level ${level.id}: expected a reachable outer color`)

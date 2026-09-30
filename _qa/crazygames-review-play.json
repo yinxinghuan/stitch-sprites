@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "screenshots": [],
+  "firstTen": [
+    {
+      "level": 1,
+      "harnessSeconds": 21.55,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 2,
+      "harnessSeconds": 24.93,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 3,
+      "harnessSeconds": 25.49,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 4,
+      "harnessSeconds": 24.53,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 5,
+      "harnessSeconds": 21.88,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 6,
+      "harnessSeconds": 24.33,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 7,
+      "harnessSeconds": 27.47,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 8,
+      "harnessSeconds": 24.42,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 9,
+      "harnessSeconds": 27.03,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    },
+    {
+      "level": 10,
+      "harnessSeconds": 24.32,
+      "timingMode": "accelerated automated browser",
+      "failure": null,
+      "impossible": false
+    }
+  ],
+  "initialTransfer": {
+    "bytes": 0,
+    "files": [],
+    "requestedPatterns": []
+  }
+}
