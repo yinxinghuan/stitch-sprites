@@ -18,6 +18,32 @@
           "height": 450
         }
       },
+      "midState": {
+        "visibleMissionCount": 4,
+        "spools": [
+          {
+            "name": "red",
+            "count": "40",
+            "state": "READY"
+          },
+          {
+            "name": "green",
+            "count": "40",
+            "state": "READY"
+          },
+          {
+            "name": "green",
+            "count": "21",
+            "state": "READY"
+          },
+          {
+            "name": "red",
+            "count": "40",
+            "state": "READY"
+          }
+        ]
+      },
+      "firstTenDistinct": true,
       "events": [
         "init",
         "loadingStart",

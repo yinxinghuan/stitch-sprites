@@ -4,70 +4,70 @@
   "firstTen": [
     {
       "level": 1,
-      "harnessSeconds": 21.55,
+      "harnessSeconds": 16.98,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 2,
-      "harnessSeconds": 24.93,
+      "harnessSeconds": 21.08,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 3,
-      "harnessSeconds": 25.49,
+      "harnessSeconds": 22.49,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 4,
-      "harnessSeconds": 24.53,
+      "harnessSeconds": 20.36,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 5,
-      "harnessSeconds": 21.88,
+      "harnessSeconds": 25.98,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 6,
-      "harnessSeconds": 24.33,
+      "harnessSeconds": 22.14,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 7,
-      "harnessSeconds": 27.47,
+      "harnessSeconds": 20.11,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 8,
-      "harnessSeconds": 24.42,
+      "harnessSeconds": 28.75,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 9,
-      "harnessSeconds": 27.03,
+      "harnessSeconds": 25.44,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false
     },
     {
       "level": 10,
-      "harnessSeconds": 24.32,
+      "harnessSeconds": 16.09,
       "timingMode": "accelerated automated browser",
       "failure": null,
       "impossible": false

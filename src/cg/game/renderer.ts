@@ -7,6 +7,8 @@ interface Mission extends StitchTask {
   returnMs: number
   threadDelayMs: number
   threadRecoveryMs: number
+  visualLane: number
+  visualCount: number
 }
 
 const CONTACT_MS = 260
@@ -124,18 +126,32 @@ export class BoardRenderer {
 
   launch(tasks: StitchTask[]): void {
     const waveStartedAt = performance.now()
-    const prepared = tasks.map((task) => ({
+    // The engine may clear a dozen stitches in one wave, but drawing every
+    // worker at the shared hoop entrance turns them into an opaque black pile.
+    // Keep four evenly spaced representatives; the thread motion still shows
+    // the full batch while the stitched subject remains readable.
+    const openVisualSlots = Math.max(0, 4 - this.missions.length)
+    if (!openVisualSlots) return
+    const visibleTasks = tasks.length <= openVisualSlots
+      ? tasks
+      : Array.from({ length: openVisualSlots }, (_, index) => (
+        tasks[Math.round(index * (tasks.length - 1) / Math.max(1, openVisualSlots - 1))]
+      ))
+    const prepared = visibleTasks.map((task) => ({
       task,
       returnMs: Math.max(440, task.travelMs * (0.7 + (task.workerIndex % 3) * 0.018)),
     }))
     const waveSpriteEnd = Math.max(...prepared.map(({ task, returnMs }) => (
       task.departMs + task.travelMs + CONTACT_MS + returnMs + PORTAL_DROP_MS
     )))
-    prepared.forEach(({ task, returnMs }) => {
+    const occupiedVisualSlots = this.missions.length
+    prepared.forEach(({ task, returnMs }, visualLane) => {
       this.missions.push({
         ...task,
         startedAt: waveStartedAt + task.departMs,
         returnMs,
+        visualLane: occupiedVisualSlots + visualLane,
+        visualCount: 4,
         threadDelayMs: Math.max(
           0,
           waveSpriteEnd + 230 + task.workerIndex * 96 - task.departMs - task.travelMs - CONTACT_MS,
@@ -166,6 +182,10 @@ export class BoardRenderer {
     this.destroyed = true
     this.resizeObserver.disconnect()
     if (this.frame) cancelAnimationFrame(this.frame)
+  }
+
+  get visibleMissionCount(): number {
+    return this.missions.length
   }
 
   private resize(): void {
@@ -636,13 +656,18 @@ export class BoardRenderer {
       const wander = this.reducedMotion ? 0 : Math.sin(elapsed / (94 + mission.workerIndex % 4 * 9) + mission.workerIndex * 1.7) * Math.min(0.7, geo.cellSize * 0.075)
       const formation = returning ? 0 : Math.min(1, pathProgress * 5)
       const lateralOffset = (spread + wander) * formation
-      const x = position.x + Math.cos(direction + Math.PI / 2) * lateralOffset
-      const y = position.y + Math.sin(direction + Math.PI / 2) * lateralOffset
+      const portalPhase = returning
+        ? Math.pow(returnProgress, 2)
+        : Math.pow(1 - outboundProgress, 2)
+      const portalLane = mission.visualLane - (mission.visualCount - 1) / 2
+      const portalSpread = portalLane * Math.min(28, geo.hoopRadius * 0.15) * portalPhase
+      const x = position.x + Math.cos(direction + Math.PI / 2) * lateralOffset + portalSpread
+      const y = position.y + Math.sin(direction + Math.PI / 2) * lateralOffset - Math.abs(portalLane) * 2.5 * portalPhase
       const gait = elapsed / (108 + mission.workerIndex % 4 * 8) + mission.workerIndex * 0.73
       ctx.save()
       const sizeVariation = 0.92 + ((mission.workerIndex * 7) % 5) * 0.04
-      const effectRadius = Math.max(8.6, geo.cellSize * 1.58 * sizeVariation)
-      const radius = Math.max(10.2, geo.cellSize * 1.86 * sizeVariation)
+      const effectRadius = Math.max(7.4, geo.cellSize * 1.36 * sizeVariation)
+      const radius = Math.max(8.4, geo.cellSize * 1.52 * sizeVariation)
       const contactProgress = Math.max(0, Math.min(1, (elapsed - mission.travelMs) / CONTACT_MS))
       const targetX = geo.left + (mission.col + 0.5) * geo.cellSize
       const targetY = geo.top + (mission.row + 0.5) * geo.cellSize

@@ -74,21 +74,36 @@ async function captureViewport(viewport) {
   if (tutorialLayout.scroll.width > viewport.width || tutorialLayout.scroll.height > viewport.height) throw new Error(`${size}: page overflow ${JSON.stringify(tutorialLayout)}`)
   await page.locator('[data-cg="tutor-skip"]').click()
   await clickColumn(page, patterns[0].solution[0])
+  const midState = await page.evaluate(() => ({
+    visibleMissionCount: window.__CG_QA__.visibleMissionCount,
+    spools: [...document.querySelectorAll('.ss-spool')].map((spool) => ({
+      name: spool.querySelector('.ss-spool__name')?.textContent?.trim(),
+      count: spool.querySelector('strong > span')?.textContent?.trim(),
+      state: spool.querySelector('.ss-spool__state')?.textContent?.trim(),
+    })),
+  }))
+  if (midState.visibleMissionCount > 4) throw new Error(`${size}: ${midState.visibleMissionCount} visible sprites obscure the pattern`)
+  if (midState.spools.length !== 4 || midState.spools.some((spool) => !spool.name || !spool.count || !['READY', 'WAIT'].includes(spool.state))) {
+    throw new Error(`${size}: unreadable reel state ${JSON.stringify(midState.spools)}`)
+  }
   await page.screenshot({ path: path.join(outputDir, `${size}-mid.png`) })
   for (const column of patterns[0].solution.slice(1)) await clickColumn(page, column)
   await page.locator('.cg-result').waitFor({ timeout: 30000 })
   const resultText = await page.locator('.cg-result').innerText()
   if (!resultText.includes('Next pattern:') || !resultText.includes('Next unlock:')) throw new Error(`${size}: incomplete result copy: ${resultText}`)
   await page.screenshot({ path: path.join(outputDir, `${size}-complete.png`) })
+  await page.evaluate(() => window.__CG_QA__.unlockThrough(10))
   await page.locator('[data-cg="album"]').click()
   await page.locator('.ss-gallery').waitFor()
+  const firstTenThumbs = await page.evaluate(() => [...document.querySelectorAll('.ss-pattern-thumb')].slice(0, 10).map((canvas) => canvas.toDataURL()))
+  if (firstTenThumbs.length !== 10 || new Set(firstTenThumbs).size !== 10) throw new Error(`${size}: first ten gallery thumbnails are not distinct`)
   await page.screenshot({ path: path.join(outputDir, `${size}-album.png`) })
   const events = await page.evaluate(() => window.__cgEvents)
   for (const expected of ['init', 'loadingStart', 'loadingStop', 'gameplayStart', 'gameplayStop']) {
     if (!events.includes(expected)) throw new Error(`${size}: missing SDK event ${expected}: ${events.join(',')}`)
   }
   await context.close()
-  return { viewport: size, tutorialLayout, events, resultText }
+  return { viewport: size, tutorialLayout, midState, firstTenDistinct: true, events, resultText }
 }
 
 async function playFirstTen() {

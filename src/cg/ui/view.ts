@@ -218,13 +218,16 @@ export class GameView {
     const thread = resolveThreadStyle(spool.color, level.displayPalette)
     const colorName = t(`color.${spool.color}`)
     const label = t('tray.spool', { color: colorName, n: spool.remaining })
+    const state = enabled ? 'READY' : 'WAIT'
     return `
-      <button class="ss-spool ${enabled ? '' : 'ss-spool--disabled'}" type="button" data-column="${columnIndex}" ${enabled ? '' : 'disabled'} style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${label}">
+      <button class="ss-spool ${enabled ? 'ss-spool--ready' : 'ss-spool--disabled'}" type="button" data-column="${columnIndex}" ${enabled ? '' : 'disabled'} style="--thread:${thread.hex};--thread-dark:${thread.dark};--thread-light:${thread.light}" aria-label="${label}; ${state.toLowerCase()}">
         <span class="ss-spool__card">
           <span class="ss-spool__notch ss-spool__notch--top"></span>
           <span class="ss-spool__thread"></span>
+          <span class="ss-spool__name">${colorName}</span>
           <span class="ss-color-symbol ss-color-symbol--${thread.symbol}" aria-hidden="true"></span>
-          <strong>${spool.remaining}</strong>
+          <strong><span>${spool.remaining}</span><small>stitches</small></strong>
+          <span class="ss-spool__state">${state}</span>
           <span class="ss-spool__notch ss-spool__notch--bottom"></span>
         </span>
       </button>

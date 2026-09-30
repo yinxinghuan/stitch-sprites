@@ -9,6 +9,7 @@ import travelUrl from './cg/audio/travel.ogg'
 import waitUrl from './cg/audio/wait.ogg'
 import winUrl from './cg/audio/win.ogg'
 import { GameEngine } from './cg/game/engine'
+import { LEVELS } from './cg/game/levels'
 import { BoardRenderer } from './cg/game/renderer'
 import type { GameSnapshot } from './cg/game/types'
 import { createGuestServices } from './cg/platform'
@@ -52,7 +53,13 @@ if (new URLSearchParams(location.search).get('qa') === '1') {
   ;(window as unknown as { __CG_QA__: unknown }).__CG_QA__ = {
     get snapshot() { return engine.snapshot },
     get isProcessing() { return engine.isProcessing },
+    get visibleMissionCount() { return renderer.visibleMissionCount },
     selectColumn: (column: number) => engine.selectColumn(column),
+    unlockThrough: (level: number) => engine.applyMergedProgress({
+      ...engine.persistedProgress,
+      unlockedLevel: Math.max(engine.unlockedLevel, Math.min(LEVELS.length, level)),
+      updatedAt: Date.now(),
+    }),
   }
 }
 
